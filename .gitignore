@@ -45,3 +45,5 @@ build/
 lib/
 /codeql/
 /swiyu-issuer-codeql-db/
+/did-server/storage/
+/did-operations/

@@ -7,10 +7,10 @@ import ch.admin.eid.didresolver.Did;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
-public class Main {
+public class Verify {
    public static void main(String... args) {
       try {
-         String log = Files.readString(Path.of("/Users/micharoon/projects/swiyu/didtoolbox-java/managination/didlog.jsonl")).replaceAll("\\r?\\n\\s*", "");
+         String log = Files.readString(Path.of("managination/didlog.jsonl")).replaceAll("\\r?\\n\\s*", "");
 // Detect DID ID from the log
          String id = WebVerifiableHistoryDidLogMetaPeeker.peek(log).getDidDoc().getId();
 
