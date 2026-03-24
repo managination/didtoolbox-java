@@ -6,11 +6,13 @@ import ch.admin.eid.did_sidekicks.DidMethodParameter;
 import ch.admin.eid.didresolver.Did;
 import ch.admin.eid.didresolver.DidResolveException;
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import com.google.gson.JsonSyntaxException;
 import com.google.gson.annotations.SerializedName;
+import com.google.gson.stream.JsonReader;
+import com.google.gson.stream.JsonToken;
 import lombok.Getter;
 
-import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.StringReader;
 import java.util.Map;
@@ -49,42 +51,37 @@ public final class WebVerifiableHistoryDidLogMetaPeeker {
     @SuppressWarnings({"PMD.CyclomaticComplexity"})
     public static DidLogMeta peek(String didLog) throws DidLogMetaPeekerException {
 
+        var normalizedLog = normalize(didLog);
+
         AtomicReference<Exception> jsonSyntaxEx = new AtomicReference<>();
         AtomicReference<String> lastVersionId = new AtomicReference<>();
         AtomicReference<String> dateTime = new AtomicReference<>();
         AtomicReference<String> didDocId = new AtomicReference<>();
 
-        // CAUTION Trimming the existing DID log prevents ending up parsing empty lines
-        BufferedReader reader = new BufferedReader(new StringReader(didLog.trim()));
+        Gson gson = new Gson();
+        try (JsonReader reader = new JsonReader(new StringReader(normalizedLog))) {
+            reader.setLenient(true);
 
-        AtomicReference<WebVhDidLogEntry> didLogEntry = new AtomicReference<>();
-        reader.lines().takeWhile(line -> {
-            try {
-                didLogEntry.set(new Gson().fromJson(line, WebVhDidLogEntry.class)); // may throw JsonSyntaxException
-            } catch (JsonSyntaxException e) {
-                jsonSyntaxEx.set(e);
-                return false; // short-circuit the stream
+            while (reader.peek() != JsonToken.END_DOCUMENT) {
+                WebVhDidLogEntry entry = gson.fromJson(reader, WebVhDidLogEntry.class);
+
+                if (entry != null) {
+                    lastVersionId.set(entry.versionId);
+                    dateTime.set(entry.versionTime);
+
+                    // Skip parsing the parameters, as they will be supplied by the resolver afterwards
+
+                    var didDocument = entry.getDidDocument();
+                    if (didDocument != null && didDocument.getId() != null) {
+                        didDocId.set(didDocument.getId());
+                    }
+                }
             }
-
-            return true;
-
-        }).forEach(ignored -> { // CAUTION The string var is ignored here, as the DID log entry deserialisation has already been done earlier by takeWhile
-
-            lastVersionId.set(didLogEntry.get().versionId);
-            dateTime.set(didLogEntry.get().versionTime);
-
-            // Skip parsing the parameters (didLogEntryElements[2]), as they will be supplied by the resolver afterwards
-
-            var didDocument = didLogEntry.get().getDidDocument();
-            if (didDocument != null && didDocument.getId() != null) {
-                didDocId.set(didDocument.getId());
-            }
-        });
-
-        try {
-            reader.close();
-        } catch (IOException ignore) {
-            //
+        } catch (JsonSyntaxException e) {
+            jsonSyntaxEx.set(e);
+        } catch (IOException e) {
+            // This should not happen with StringReader, but we must handle it
+            throw new DidLogMetaPeekerException("Failed to read DID log", e);
         }
 
         if (jsonSyntaxEx.get() != null) {
@@ -121,7 +118,7 @@ public final class WebVerifiableHistoryDidLogMetaPeeker {
         DidDoc didDoc;
         Map<String, DidMethodParameter> didMethodParameters;
         try {
-            var resolveAll = new Did(didDocId.get()).resolveAll(didLog);
+            var resolveAll = new Did(didDocId.get()).resolveAll(normalizedLog);
             didDoc = resolveAll.getDidDoc();
             didMethodParameters = resolveAll.getDidMethodParameters();
         } catch (DidResolveException e) {
@@ -129,5 +126,27 @@ public final class WebVerifiableHistoryDidLogMetaPeeker {
         }
 
         return new DidLogMeta(lastVersionId.get(), lastVersionNumber, dateTime.get(), didMethodParameters, didDoc);
+    }
+
+    private static String normalize(String didLog) {
+        if (didLog == null || didLog.trim().isEmpty()) {
+            return didLog;
+        }
+
+        StringBuilder sb = new StringBuilder();
+        Gson gson = new GsonBuilder().create();
+        try (JsonReader reader = new JsonReader(new StringReader(didLog.trim()))) {
+            reader.setLenient(true);
+            while (reader.peek() != JsonToken.END_DOCUMENT) {
+                Object entry = gson.fromJson(reader, Object.class);
+                if (entry != null) {
+                    sb.append(gson.toJson(entry)).append('\n');
+                }
+            }
+        } catch (Exception e) {
+            // If normalization fails, return the original and let the parser handle it
+            return didLog;
+        }
+        return sb.toString();
     }
 }
