@@ -5,8 +5,13 @@ import ch.admin.eid.didresolver.Did;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -50,9 +55,24 @@ public class DidController {
                         .body("Domain mismatch: expected " + extractedDomain + " but got " + domain);
             }
 
-            new Did(id).resolveAll(normalizedLog);
-
             Path targetPath = getFilePath(id);
+
+            // SCID check: if a did.jsonl already exists, ensure the new file has the same SCID
+            if (Files.exists(targetPath)) {
+                String existingContent = Files.readString(targetPath, StandardCharsets.UTF_8);
+                String normalizedExisting = existingContent.replaceAll("\\r?\\n\\s*", "");
+                String existingId = WebVerifiableHistoryDidLogMetaPeeker.peek(normalizedExisting).getDidDoc().getId();
+                String existingScid = extractScidFromDid(existingId);
+
+                String newScid = extractScidFromDid(id);
+
+                if (!newScid.equals(existingScid)) {
+                    return ResponseEntity.badRequest()
+                            .body("SCID mismatch: existing DID has SCID " + existingScid + " but new DID has SCID " + newScid);
+                }
+            }
+
+            new Did(id).resolveAll(normalizedLog);
 
             // If successful, store the file
             saveFile(targetPath, content);
@@ -63,6 +83,59 @@ public class DidController {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body("Verification FAILED: " + e.getMessage() + (e.getCause() != null ? " Cause: " + e.getCause().getMessage() : ""));
         }
+    }
+
+    @GetMapping("/**")
+    public ResponseEntity<Resource> downloadDid(HttpServletRequest request) {
+        try {
+            String domain = request.getServerName();
+            String requestPath = request.getRequestURI();
+
+            if (requestPath.equals("/dids")) {
+                return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).build();
+            }
+
+            // Remove leading / to get path components
+            String cleanPath = requestPath.startsWith("/") ? requestPath.substring(1) : requestPath;
+
+            Path fullPath = Paths.get(storagePath).resolve(domain);
+
+            if (cleanPath.isEmpty() || cleanPath.equals(".well-known")) {
+                fullPath = fullPath.resolve(".well-known");
+            } else {
+                String[] parts = cleanPath.split("/");
+                for (String part : parts) {
+                    if (!part.isEmpty()) {
+                        fullPath = fullPath.resolve(part);
+                    }
+                }
+            }
+
+            Path targetFile = fullPath.resolve("did.jsonl");
+            log.info("Downloading DID file: {}", targetFile);
+
+            if (!Files.exists(targetFile)) {
+                return ResponseEntity.notFound().build();
+            }
+
+            Resource resource = new UrlResource(targetFile.toUri());
+            return ResponseEntity.ok()
+                    .contentType(MediaType.parseMediaType("application/jsonl"))
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"did.jsonl\"")
+                    .body(resource);
+
+        } catch (Exception e) {
+            log.error("Error downloading DID", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    private String extractScidFromDid(String didId) {
+        String[] parts = didId.split(":");
+        if (parts.length < 4 || !parts[0].equals("did") || !parts[1].equals("webvh")) {
+            throw new IllegalArgumentException("Only did:webvh with SCID is supported currently");
+        }
+        return parts[2];
     }
 
     private String extractDomainFromDid(String didId) {
