@@ -1,35 +1,44 @@
-FROM alpine/curl AS curl
-
-# All version are avilable here: https://central.sonatype.com/artifact/ch.admin.swiyu/didtoolbox/versions
-ARG VERSION="1.9.0"
+# Multi-stage build for did-server SpringBoot application
+# Build stage
+FROM maven:3.9-eclipse-temurin-21-alpine AS builder
 
 WORKDIR /app
-RUN curl --fail --output /app/app.jar \
-    "https://repo1.maven.org/maven2/ch/admin/swiyu/didtoolbox/$VERSION/didtoolbox-$VERSION-jar-with-dependencies.jar"
 
-# See https://github.com/GoogleContainerTools/distroless/blob/main/java
+# Copy pom files first for better layer caching
+# Copy all pom.xml files to satisfy Maven module structure
+COPY pom.xml .
+COPY did-toolbox/pom.xml did-toolbox/
+COPY did-server/pom.xml did-server/
+
+# Copy examples pom files (needed for module structure, but we won't build them)
+COPY did-toolbox/examples/pom.xml did-toolbox/examples/
+COPY did-toolbox/examples/did-operations/pom.xml did-toolbox/examples/did-operations/
+COPY did-toolbox/examples/using-pre-rotation-keys/pom.xml did-toolbox/examples/using-pre-rotation-keys/
+
+# Download dependencies (cached layer) - only for modules we need
+RUN mvn dependency:go-offline -B -pl did-server -am
+
+# Copy source code
+COPY did-toolbox/src did-toolbox/src
+COPY did-server/src did-server/src
+
+# Build the did-server module (which includes did-toolbox as dependency)
+RUN mvn clean package -B -DskipTests -pl did-server -am
+
+# Runtime stage - using distroless for minimal image
 FROM gcr.io/distroless/java21-debian12
+
 WORKDIR /app
-COPY --from=curl /app ./
+
+# Copy the built JAR from builder stage
+COPY --from=builder /app/did-server/target/did-server-*.jar app.jar
 
 # Accept timezone as a build argument with a default
 ARG TZ="Europe/Zurich"
 ENV TZ=${TZ}
 
-# CAUTION The entrypoint of this image is set to the equivalent of "java -jar",
-#         so this image expects users to supply a path to a JAR file in the CMD ["/app/app.jar"].
-#         However, additional CLI options can be supplied only via ENTRYPOINT
-ENTRYPOINT ["java", "-jar", "/app/app.jar"]
+# Expose the default SpringBoot port
+EXPOSE 8080
 
-# To be able to use HSM keys (e.g. Securosys Primus HSM),
-# the relevant [Securosys Primus libraries](https://docs.securosys.com/jce/Downloads/) are required.
-# For the purpose of referencing them on the file system,
-# the following [extra option for java](https://docs.oracle.com/en/java/javase/24/docs/specs/man/java.html#extra-options-for-java) is available e.g.
-#
-# -Xbootclasspath/a:directories|zip|JAR-files
-#    Specifies a list of directories, JAR files, and ZIP archives to append to the end of the default bootstrap class path.
-#
-#    On Windows, semicolons (;) separate entities in this list; on other platforms it is a colon (:).
-#
-# For instance, assuming the Primus libs are stored in the lib directory, the ENTRYPOINT should be extended the following way:
-# ENTRYPOINT ["java", "-Xbootclasspath/a:lib/primusX-java8.jar:lib/primusX-java11.jar", "-jar", "/app/app.jar"]
+# Run the SpringBoot application
+ENTRYPOINT ["java", "-jar", "/app/app.jar"]
