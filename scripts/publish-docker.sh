@@ -7,8 +7,8 @@ set -ek
 
 # Configuration
 DOCKER_USERNAME="micharoon"
-IMAGE_NAME="numaquest"
-VERSION="0.0.1"
+IMAGE_NAME="webvh-store"
+VERSION="latest"
 FULL_IMAGE_NAME="${DOCKER_USERNAME}/${IMAGE_NAME}:${VERSION}"
 
 echo "=========================================="
