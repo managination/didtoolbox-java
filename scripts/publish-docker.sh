@@ -6,7 +6,7 @@
 set -e
 
 # Configuration
-DOCKER_USERNAME="micharoon"
+DOCKER_USERNAME="managination"
 IMAGE_NAME="webvh-store"
 VERSION="latest"
 FULL_IMAGE_NAME="${DOCKER_USERNAME}/${IMAGE_NAME}:${VERSION}"
