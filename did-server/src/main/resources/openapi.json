@@ -1,0 +1,321 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "DID Server API",
+    "description": "API for managing Decentralized Identifiers (DIDs) using the did:webvh method. This server provides endpoints for uploading, verifying, and downloading DID documents.",
+    "version": "1.9.1-SNAPSHOT",
+    "contact": {
+      "name": "Swiss Federal Chancellery"
+    },
+    "license": {
+      "name": "Apache License 2.0"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8080",
+      "description": "Local development server"
+    }
+  ],
+  "tags": [
+    {
+      "name": "DID Management",
+      "description": "Endpoints for uploading and retrieving DID documents"
+    },
+    {
+      "name": "Health",
+      "description": "Health check and system status endpoints"
+    }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": ["Health"],
+        "summary": "Check server health status",
+        "description": "Returns comprehensive health information including filesystem, memory, JVM, and environment status. Returns 503 if any component is degraded.",
+        "operationId": "getHealth",
+        "responses": {
+          "200": {
+            "description": "Server is healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthStatus"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Server is degraded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthStatus"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/dids": {
+      "post": {
+        "tags": ["DID Management"],
+        "summary": "Upload a DID log file",
+        "description": "Upload and verify a DID log file (JSONL format). The domain in the DID ID must match the Host header. If the file already exists, the SCID must match.",
+        "operationId": "uploadDid",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "didJsonl": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "The DID log file in JSONL format"
+                  }
+                },
+                "required": ["didJsonl"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "DID uploaded and verified successfully",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "example": "DID uploaded and verified successfully: did:webvh:SCID:example.com"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "example": "Verification FAILED: Domain mismatch"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/**": {
+      "get": {
+        "tags": ["DID Management"],
+        "summary": "Download a DID document",
+        "description": "Downloads a DID file based on the request path and Host header. The DID is resolved from {storage.path}/{domain}/{path}/did.jsonl",
+        "operationId": "downloadDid",
+        "parameters": [
+          {
+            "name": "Host",
+            "in": "header",
+            "required": true,
+            "description": "The domain to resolve the DID for",
+            "schema": {
+              "type": "string",
+              "example": "example.com"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "DID document found",
+            "content": {
+              "application/jsonl": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "DID document not found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Method not allowed for this path",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "HealthStatus": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": ["UP", "DEGRADED"],
+            "description": "Overall server status"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO-8601 timestamp of the health check"
+          },
+          "filesystem": {
+            "$ref": "#/components/schemas/FilesystemHealth"
+          },
+          "memory": {
+            "$ref": "#/components/schemas/MemoryHealth"
+          },
+          "jvm": {
+            "$ref": "#/components/schemas/JvmHealth"
+          },
+          "environment": {
+            "$ref": "#/components/schemas/EnvironmentHealth"
+          }
+        }
+      },
+      "FilesystemHealth": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": ["UP", "DOWN", "DEGRADED"]
+          },
+          "storagePath": {
+            "type": "string",
+            "description": "Path to the DID storage directory"
+          },
+          "availableSpace": {
+            "type": "string",
+            "description": "Available storage space (e.g., '100.00 MB')"
+          },
+          "reason": {
+            "type": "string",
+            "description": "Reason if status is DOWN or DEGRADED"
+          }
+        }
+      },
+      "MemoryHealth": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": ["UP", "DOWN", "DEGRADED"]
+          },
+          "heap": {
+            "$ref": "#/components/schemas/HeapMemory"
+          },
+          "nonHeap": {
+            "$ref": "#/components/schemas/NonHeapMemory"
+          }
+        }
+      },
+      "HeapMemory": {
+        "type": "object",
+        "properties": {
+          "max": {
+            "type": "string"
+          },
+          "used": {
+            "type": "string"
+          },
+          "committed": {
+            "type": "string"
+          },
+          "usagePercent": {
+            "type": "string"
+          }
+        }
+      },
+      "NonHeapMemory": {
+        "type": "object",
+        "properties": {
+          "used": {
+            "type": "string"
+          },
+          "committed": {
+            "type": "string"
+          }
+        }
+      },
+      "JvmHealth": {
+        "type": "object",
+        "properties": {
+          "availableProcessors": {
+            "type": "integer"
+          },
+          "threadCount": {
+            "type": "integer"
+          },
+          "peakThreadCount": {
+            "type": "integer"
+          },
+          "uptime": {
+            "type": "string"
+          },
+          "vmName": {
+            "type": "string"
+          },
+          "vmVersion": {
+            "type": "string"
+          },
+          "gcCollections": {
+            "type": "integer"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["UP", "DOWN"]
+          }
+        }
+      },
+      "EnvironmentHealth": {
+        "type": "object",
+        "properties": {
+          "tempDir": {
+            "type": "string"
+          },
+          "userDir": {
+            "type": "string"
+          },
+          "fileEncoding": {
+            "type": "string"
+          },
+          "defaultLocale": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["UP", "DOWN"]
+          }
+        }
+      }
+    }
+  }
+}

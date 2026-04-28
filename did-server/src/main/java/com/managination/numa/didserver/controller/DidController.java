@@ -2,9 +2,11 @@ package com.managination.numa.didserver.controller;
 
 import ch.admin.bj.swiyu.didtoolbox.model.WebVerifiableHistoryDidLogMetaPeeker;
 import ch.admin.eid.didresolver.Did;
+import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
 import org.springframework.http.HttpHeaders;
@@ -16,8 +18,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.mvc.condition.RequestCondition;
 
-import jakarta.servlet.http.HttpServletRequest;
 import java.io.IOException;
 import java.lang.management.ManagementFactory;
 import java.lang.management.MemoryMXBean;
@@ -29,6 +31,7 @@ import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
 @RestController
 public class DidController {
@@ -37,6 +40,14 @@ public class DidController {
 
     @Value("${storage.did.path}")
     private String storagePath;
+
+    private static final Set<String> DOC_PATHS = Set.of(
+        "/docs", "/v3/api-docs", "/swagger-ui-docs", "/swagger-ui"
+    );
+
+    private boolean isDocPath(String path) {
+        return DOC_PATHS.stream().anyMatch(p -> path.equals(p) || path.startsWith(p + "/") || path.startsWith(p + "?"));
+    }
 
     @GetMapping("/health")
     public ResponseEntity<Map<String, Object>> healthCheck() {
@@ -286,16 +297,15 @@ public class DidController {
     }
 
     @GetMapping("/**")
-    public ResponseEntity<Resource> downloadDid(HttpServletRequest request) {
+    public ResponseEntity<?> downloadDid(HttpServletRequest request) {
         try {
-            String domain = request.getServerName();
             String requestPath = request.getRequestURI();
 
             if (requestPath.equals("/dids") || requestPath.equals("/health")) {
                 return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).build();
             }
 
-            // Remove leading / to get path components
+            String domain = request.getServerName();
             String cleanPath = requestPath.startsWith("/") ? requestPath.substring(1) : requestPath;
 
             Path fullPath = Paths.get(storagePath).resolve(domain);
@@ -315,7 +325,9 @@ public class DidController {
             log.info("Downloading DID file: {}", targetFile);
 
             if (!Files.exists(targetFile)) {
-                return ResponseEntity.notFound().build();
+                Resource resource = new ByteArrayResource("DID file not found for this domain/path".getBytes());
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                      .body("DID file not found for this domain/path");
             }
 
             Resource resource = new UrlResource(targetFile.toUri());
