@@ -11,21 +11,39 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+/**
+ * Integration tests for {@link DidController}.
+ * <p>
+ * These tests verify the behavior of DID upload, domain validation, SCID validation,
+ * and DID download endpoints using Spring's {@code MockMvc} framework.
+ * </p>
+ *
+ * @author Swiss Federal Chancellery
+ */
 @SpringBootTest
 @AutoConfigureMockMvc
 public class DidControllerTest {
 
+    /**
+     * MockMvc instance for performing HTTP requests against the controller.
+     */
     @Autowired
     private MockMvc mockMvc;
 
+    /**
+     * Tests uploading a valid DID log file for a sub-path domain.
+     * <p>
+     * Verifies that the upload succeeds, the response contains a success message,
+     * and the file is stored at the expected path.
+     * </p>
+     *
+     * @throws Exception if the test fails
+     */
     @Test
     public void testUploadValidDid() throws Exception {
         // Path to the example DID log from the issue description context
@@ -54,6 +72,14 @@ public class DidControllerTest {
         assertTrue(Files.exists(expectedPath), "Expected file does not exist at: " + expectedPath.toAbsolutePath());
     }
 
+    /**
+     * Tests uploading a valid DID log file for a root domain (no sub-path).
+     * <p>
+     * Verifies that the DID is stored under the {@code .well-known} directory.
+     * </p>
+     *
+     * @throws Exception if the test fails
+     */
     @Test
     public void testUploadRootDomainDid() throws Exception {
         // Path to the micha.did.ninja DID log
@@ -79,6 +105,12 @@ public class DidControllerTest {
         assertTrue(Files.exists(expectedPath), "Expected file does not exist at: " + expectedPath.toAbsolutePath());
     }
 
+    /**
+     * Tests that uploading a DID with a mismatched domain in the {@code Host} header
+     * results in a {@code 400 Bad Request} response.
+     *
+     * @throws Exception if the test fails
+     */
     @Test
     public void testUploadDomainMismatch() throws Exception {
         Path logPath = Paths.get("../did-operations/micha.did.ninja/did.jsonl");
@@ -93,6 +125,15 @@ public class DidControllerTest {
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("Domain mismatch")));
     }
 
+    /**
+     * Tests the SCID validation logic by pre-populating a DID file with one SCID
+     * and then attempting to upload a different DID with a different SCID to the same path.
+     * <p>
+     * This verifies that the server prevents SCID mismatches when updating existing DIDs.
+     * </p>
+     *
+     * @throws Exception if the test fails
+     */
     @Test
     public void testScidCheck() throws Exception {
         // 1. Upload initial DID
@@ -150,6 +191,12 @@ public class DidControllerTest {
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("SCID mismatch")));
     }
 
+    /**
+     * Tests that uploading an invalid (non-JSON) DID file results in a
+     * {@code 400 Bad Request} response with a verification failure message.
+     *
+     * @throws Exception if the test fails
+     */
     @Test
     public void testUploadInvalidDid() throws Exception {
         MockMultipartFile file = new MockMultipartFile("didJsonl", "invalid.jsonl", "application/json", "invalid json".getBytes());
@@ -160,6 +207,18 @@ public class DidControllerTest {
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("Verification FAILED")));
     }
 
+    /**
+     * Tests the DID download endpoint with multiple scenarios:
+     * <ul>
+     *   <li>Download from {@code .well-known} path</li>
+     *   <li>Download from root path</li>
+     *   <li>Download from a sub-path</li>
+     *   <li>Not found for a non-existent path</li>
+     *   <li>Method not allowed for {@code GET /dids}</li>
+     * </ul>
+     *
+     * @throws Exception if the test fails
+     */
     @Test
     public void testDownloadDid() throws Exception {
         // 1. Setup a file to download

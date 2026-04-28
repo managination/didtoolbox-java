@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "DID Server API",
-    "description": "API for managing Decentralized Identifiers (DIDs) using the did:webvh method. This server provides endpoints for uploading, verifying, and downloading DID documents.",
+    "description": "API for managing Decentralized Identifiers (DIDs) using the did:webvh method. This server provides endpoints for uploading, verifying, and downloading DID documents.\n\n## DID Format\n\nThis server supports the `did:webvh` method with SCID (Self-Contained Identifier).\n\n**Format:** `did:webvh:SCID:domain[:path...]`\n\n**Example:** `did:webvh:SCID:example.com:.well-known`\n\n## Storage Structure\n\nDID files are stored as `did.jsonl` in the following structure:\n- Root domain: `{storagePath}/{domain}/.well-known/did.jsonl`\n- Sub-path: `{storagePath}/{domain}/{path}/did.jsonl`",
     "version": "1.9.1-SNAPSHOT",
     "contact": {
       "name": "Swiss Federal Chancellery"
@@ -25,6 +25,10 @@
     {
       "name": "Health",
       "description": "Health check and system status endpoints"
+    },
+    {
+      "name": "Documentation",
+      "description": "API documentation endpoints"
     }
   ],
   "paths": {
@@ -32,7 +36,7 @@
       "get": {
         "tags": ["Health"],
         "summary": "Check server health status",
-        "description": "Returns comprehensive health information including filesystem, memory, JVM, and environment status. Returns 503 if any component is degraded.",
+        "description": "Returns comprehensive health information including filesystem, memory, JVM, and environment status. Returns 503 if any component is degraded.\n\n### Health Checks Performed\n\n- **Filesystem**: Verifies storage path is accessible, readable, writable, and has at least 100MB free space\n- **Memory**: Checks heap usage (DEGRADED > 75%, DOWN > 90%)\n- **JVM**: Reports processor count, thread counts, uptime, VM info, and GC collections\n- **Environment**: Verifies temp directory accessibility and reports encoding/locale settings",
         "operationId": "getHealth",
         "responses": {
           "200": {
@@ -41,6 +45,93 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HealthStatus"
+                },
+                "examples": {
+                  "healthy": {
+                    "summary": "Healthy server response",
+                    "value": {
+                      "status": "UP",
+                      "timestamp": "2024-01-15T10:30:00Z",
+                      "filesystem": {
+                        "status": "UP",
+                        "storagePath": "/var/dids",
+                        "availableSpace": "50.00 GB"
+                      },
+                      "memory": {
+                        "status": "UP",
+                        "heap": {
+                          "max": "4.00 GB",
+                          "used": "512.00 MB",
+                          "committed": "1.00 GB",
+                          "usagePercent": "12.50"
+                        },
+                        "nonHeap": {
+                          "used": "128.00 MB",
+                          "committed": "256.00 MB"
+                        }
+                      },
+                      "jvm": {
+                        "availableProcessors": 4,
+                        "threadCount": 25,
+                        "peakThreadCount": 30,
+                        "uptime": "3600000ms",
+                        "vmName": "OpenJDK 64-Bit Server VM",
+                        "vmVersion": "17.0.1",
+                        "gcCollections": 150,
+                        "status": "UP"
+                      },
+                      "environment": {
+                        "tempDir": "writable",
+                        "userDir": "/opt/did-server",
+                        "fileEncoding": "UTF-8",
+                        "defaultLocale": "en_US",
+                        "status": "UP"
+                      }
+                    }
+                  },
+                  "degraded": {
+                    "summary": "Degraded server response (high memory)",
+                    "value": {
+                      "status": "DEGRADED",
+                      "timestamp": "2024-01-15T10:30:00Z",
+                      "filesystem": {
+                        "status": "UP",
+                        "storagePath": "/var/dids",
+                        "availableSpace": "50.00 GB"
+                      },
+                      "memory": {
+                        "status": "DEGRADED",
+                        "reason": "Heap memory usage high: 82.50%",
+                        "heap": {
+                          "max": "4.00 GB",
+                          "used": "3.30 GB",
+                          "committed": "4.00 GB",
+                          "usagePercent": "82.50"
+                        },
+                        "nonHeap": {
+                          "used": "128.00 MB",
+                          "committed": "256.00 MB"
+                        }
+                      },
+                      "jvm": {
+                        "availableProcessors": 4,
+                        "threadCount": 25,
+                        "peakThreadCount": 30,
+                        "uptime": "3600000ms",
+                        "vmName": "OpenJDK 64-Bit Server VM",
+                        "vmVersion": "17.0.1",
+                        "gcCollections": 500,
+                        "status": "UP"
+                      },
+                      "environment": {
+                        "tempDir": "writable",
+                        "userDir": "/opt/did-server",
+                        "fileEncoding": "UTF-8",
+                        "defaultLocale": "en_US",
+                        "status": "UP"
+                      }
+                    }
+                  }
                 }
               }
             }
@@ -51,6 +142,50 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HealthStatus"
+                },
+                "examples": {
+                  "unavailable": {
+                    "summary": "Service unavailable response (disk full)",
+                    "value": {
+                      "status": "DEGRADED",
+                      "timestamp": "2024-01-15T10:30:00Z",
+                      "filesystem": {
+                        "status": "DOWN",
+                        "reason": "Low disk space",
+                        "availableSpace": "50.00 MB"
+                      },
+                      "memory": {
+                        "status": "UP",
+                        "heap": {
+                          "max": "4.00 GB",
+                          "used": "512.00 MB",
+                          "committed": "1.00 GB",
+                          "usagePercent": "12.50"
+                        },
+                        "nonHeap": {
+                          "used": "128.00 MB",
+                          "committed": "256.00 MB"
+                        }
+                      },
+                      "jvm": {
+                        "availableProcessors": 4,
+                        "threadCount": 25,
+                        "peakThreadCount": 30,
+                        "uptime": "3600000ms",
+                        "vmName": "OpenJDK 64-Bit Server VM",
+                        "vmVersion": "17.0.1",
+                        "gcCollections": 150,
+                        "status": "UP"
+                      },
+                      "environment": {
+                        "tempDir": "writable",
+                        "userDir": "/opt/did-server",
+                        "fileEncoding": "UTF-8",
+                        "defaultLocale": "en_US",
+                        "status": "UP"
+                      }
+                    }
+                  }
                 }
               }
             }
@@ -62,7 +197,7 @@
       "post": {
         "tags": ["DID Management"],
         "summary": "Upload a DID log file",
-        "description": "Upload and verify a DID log file (JSONL format). The domain in the DID ID must match the Host header. If the file already exists, the SCID must match.",
+        "description": "Upload and verify a DID log file in JSONL format. The server performs the following validations:\n\n1. Ensures the uploaded file is not empty\n2. Extracts the DID ID and verifies the domain matches the `Host` header\n3. If a file already exists at the target path, verifies the SCID matches\n4. Resolves the DID log to verify its integrity\n\nOn successful validation, the file is stored at the resolved path.\n\n### DID Format\n\n`did:webvh:SCID:domain[:path...]`\n\n### Storage Paths\n\n- Root domain: `{storagePath}/{domain}/.well-known/did.jsonl`\n- Sub-path: `{storagePath}/{domain}/{path}/did.jsonl`",
         "operationId": "uploadDid",
         "requestBody": {
           "required": true,
@@ -74,22 +209,47 @@
                   "didJsonl": {
                     "type": "string",
                     "format": "binary",
-                    "description": "The DID log file in JSONL format"
+                    "description": "The DID log file in JSONL format. Each line contains a JSON object representing a DID operation."
                   }
                 },
                 "required": ["didJsonl"]
+              },
+              "examples": {
+                "rootDomainDid": {
+                  "summary": "Root domain DID upload",
+                  "value": {
+                    "didJsonl": "{\"did\":{\"@context\":\"https://www.w3.org/ns/did/v1\",\"id\":\"did:webvh:SCID:example.com\",\"verificationMethod\":[{\"id\":\"did:webvh:SCID:example.com#key-1\",\"type\":\"JsonWebKey2020\",\"controller\":\"did:webvh:SCID:example.com\",\"publicKeyJwk\":{\"kty\":\"EC\",\"crv\":\"P-256\",\"x\":\"...\",\"y\":\"...\"}}],\"authentication\":[\"did:webvh:SCID:example.com#key-1\"]},\"meta\":{\"did\":true,\"versionId\":\"1\",\"versionTime\":\"2024-01-01T00:00:00Z\",\"proof\":{\"type\":\"DataIntegrityProof\",\"cryptosuite\":\"ecdsa-rdfc-2019\",\"proofValue\":\"...\"}}}"
+                  }
+                },
+                "subPathDid": {
+                  "summary": "Sub-path DID upload",
+                  "value": {
+                    "didJsonl": "{\"did\":{\"@context\":\"https://www.w3.org/ns/did/v1\",\"id\":\"did:webvh:SCID:example.com:api:v1:did:9131093b-ef52-46b4-8626-76dd9fe7f345\",\"verificationMethod\":[{\"id\":\"did:webvh:SCID:example.com:api:v1:did:9131093b-ef52-46b4-8626-76dd9fe7f345#key-1\",\"type\":\"JsonWebKey2020\",\"controller\":\"did:webvh:SCID:example.com:api:v1:did:9131093b-ef52-46b4-8626-76dd9fe7f345\",\"publicKeyJwk\":{\"kty\":\"EC\",\"crv\":\"P-256\",\"x\":\"...\",\"y\":\"...\"}}],\"authentication\":[\"did:webvh:SCID:example.com:api:v1:did:9131093b-ef52-46b4-8626-76dd9fe7f345#key-1\"]},\"meta\":{\"did\":true,\"versionId\":\"1\",\"versionTime\":\"2024-01-01T00:00:00Z\",\"proof\":{\"type\":\"DataIntegrityProof\",\"cryptosuite\":\"ecdsa-rdfc-2019\",\"proofValue\":\"...\"}}}"
+                  }
+                }
               }
             }
           }
         },
+        "parameters": [
+        ],
         "responses": {
           "200": {
             "description": "DID uploaded and verified successfully",
             "content": {
               "text/plain": {
                 "schema": {
-                  "type": "string",
-                  "example": "DID uploaded and verified successfully: did:webvh:SCID:example.com"
+                  "type": "string"
+                },
+                "examples": {
+                  "success": {
+                    "summary": "Successful upload",
+                    "value": "DID uploaded and verified successfully: did:webvh:SCID:example.com"
+                  },
+                  "successSubPath": {
+                    "summary": "Successful upload with sub-path",
+                    "value": "DID uploaded and verified successfully: did:webvh:SCID:example.com:api:v1:did:9131093b-ef52-46b4-8626-76dd9fe7f345"
+                  }
                 }
               }
             }
@@ -99,8 +259,25 @@
             "content": {
               "text/plain": {
                 "schema": {
-                  "type": "string",
-                  "example": "Verification FAILED: Domain mismatch"
+                  "type": "string"
+                },
+                "examples": {
+                  "emptyFile": {
+                    "summary": "Empty file",
+                    "value": "File is empty"
+                  },
+                  "domainMismatch": {
+                    "summary": "Domain mismatch",
+                    "value": "Domain mismatch: expected example.com but got wrong.com"
+                  },
+                  "scidMismatch": {
+                    "summary": "SCID mismatch",
+                    "value": "SCID mismatch: existing DID has SCID abc123 but new DID has SCID def456"
+                  },
+                  "verificationFailed": {
+                    "summary": "Verification failure",
+                    "value": "Verification FAILED: Invalid proof"
+                  }
                 }
               }
             }
@@ -112,19 +289,9 @@
       "get": {
         "tags": ["DID Management"],
         "summary": "Download a DID document",
-        "description": "Downloads a DID file based on the request path and Host header. The DID is resolved from {storage.path}/{domain}/{path}/did.jsonl",
+        "description": "Downloads a DID file based on the request path and Host header. The DID is resolved from `{storage.path}/{domain}/{path}/did.jsonl`.\n\n### Path Resolution\n\n- Root path (`/`) or `.well-known`: resolves to `{storagePath}/{domain}/.well-known/did.jsonl`\n- Sub-path (e.g., `/api/v1/did/abc`): resolves to `{storagePath}/{domain}/api/v1/did/abc/did.jsonl`\n\n### Notes\n\n- Requests to `/dids` and `/health` return 405 Method Not Allowed\n- Documentation paths (`/docs`, `/swagger-ui`, etc.) are excluded from DID resolution",
         "operationId": "downloadDid",
         "parameters": [
-          {
-            "name": "Host",
-            "in": "header",
-            "required": true,
-            "description": "The domain to resolve the DID for",
-            "schema": {
-              "type": "string",
-              "example": "example.com"
-            }
-          }
         ],
         "responses": {
           "200": {
@@ -134,6 +301,16 @@
                 "schema": {
                   "type": "string",
                   "format": "binary"
+                },
+                "examples": {
+                  "rootDomainDid": {
+                    "summary": "Root domain DID document",
+                    "value": "{\"did\":{\"@context\":\"https://www.w3.org/ns/did/v1\",\"id\":\"did:webvh:SCID:example.com\",\"verificationMethod\":[{\"id\":\"did:webvh:SCID:example.com#key-1\",\"type\":\"JsonWebKey2020\",\"controller\":\"did:webvh:SCID:example.com\",\"publicKeyJwk\":{\"kty\":\"EC\",\"crv\":\"P-256\",\"x\":\"...\",\"y\":\"...\"}}],\"authentication\":[\"did:webvh:SCID:example.com#key-1\"]},\"meta\":{\"did\":true,\"versionId\":\"1\",\"versionTime\":\"2024-01-01T00:00:00Z\",\"proof\":{\"type\":\"DataIntegrityProof\",\"cryptosuite\":\"ecdsa-rdfc-2019\",\"proofValue\":\"...\"}}}"
+                  },
+                  "subPathDid": {
+                    "summary": "Sub-path DID document",
+                    "value": "{\"did\":{\"@context\":\"https://www.w3.org/ns/did/v1\",\"id\":\"did:webvh:SCID:example.com:api:v1:did:9131093b-ef52-46b4-8626-76dd9fe7f345\",\"verificationMethod\":[{\"id\":\"did:webvh:SCID:example.com:api:v1:did:9131093b-ef52-46b4-8626-76dd9fe7f345#key-1\",\"type\":\"JsonWebKey2020\",\"controller\":\"did:webvh:SCID:example.com:api:v1:did:9131093b-ef52-46b4-8626-76dd9fe7f345\",\"publicKeyJwk\":{\"kty\":\"EC\",\"crv\":\"P-256\",\"x\":\"...\",\"y\":\"...\"}}],\"authentication\":[\"did:webvh:SCID:example.com:api:v1:did:9131093b-ef52-46b4-8626-76dd9fe7f345#key-1\"]},\"meta\":{\"did\":true,\"versionId\":\"1\",\"versionTime\":\"2024-01-01T00:00:00Z\",\"proof\":{\"type\":\"DataIntegrityProof\",\"cryptosuite\":\"ecdsa-rdfc-2019\",\"proofValue\":\"...\"}}}"
+                  }
                 }
               }
             }
@@ -144,6 +321,12 @@
               "text/plain": {
                 "schema": {
                   "type": "string"
+                },
+                "examples": {
+                  "notFound": {
+                    "summary": "DID not found",
+                    "value": "DID file not found for this domain/path"
+                  }
                 }
               }
             }
@@ -170,22 +353,63 @@
           }
         }
       }
+    },
+    "/docs": {
+      "get": {
+        "tags": ["Documentation"],
+        "summary": "Get API documentation (HTML)",
+        "description": "Returns an HTML page with interactive documentation for the DID Server API, including endpoint descriptions, DID format specifications, and error handling details.",
+        "operationId": "getDocumentation",
+        "responses": {
+          "200": {
+            "description": "HTML documentation page",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/docs/openapi.json": {
+      "get": {
+        "tags": ["Documentation"],
+        "summary": "Get OpenAPI specification",
+        "description": "Returns the OpenAPI 3.0 specification for the DID Server API in JSON format.",
+        "operationId": "getOpenApiSpec",
+        "responses": {
+          "200": {
+            "description": "OpenAPI specification in JSON format",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
       "HealthStatus": {
         "type": "object",
+        "description": "Comprehensive health status response containing subsystem health details.",
         "properties": {
           "status": {
             "type": "string",
             "enum": ["UP", "DEGRADED"],
-            "description": "Overall server status"
+            "description": "Overall server status. UP means all components are healthy, DEGRADED means at least one component has issues."
           },
           "timestamp": {
             "type": "string",
             "format": "date-time",
-            "description": "ISO-8601 timestamp of the health check"
+            "description": "ISO-8601 timestamp of when the health check was performed."
           },
           "filesystem": {
             "$ref": "#/components/schemas/FilesystemHealth"
@@ -203,31 +427,35 @@
       },
       "FilesystemHealth": {
         "type": "object",
+        "description": "File system health status including storage path accessibility and available disk space.",
         "properties": {
           "status": {
             "type": "string",
-            "enum": ["UP", "DOWN", "DEGRADED"]
+            "enum": ["UP", "DOWN", "DEGRADED"],
+            "description": "Filesystem status: UP (healthy), DOWN (inaccessible or permission denied), DEGRADED (low disk space < 100MB)."
           },
           "storagePath": {
             "type": "string",
-            "description": "Path to the DID storage directory"
+            "description": "Configured path to the DID storage directory."
           },
           "availableSpace": {
             "type": "string",
-            "description": "Available storage space (e.g., '100.00 MB')"
+            "description": "Human-readable available storage space (e.g., '50.00 GB', '100.00 MB')."
           },
           "reason": {
             "type": "string",
-            "description": "Reason if status is DOWN or DEGRADED"
+            "description": "Explanation of why the status is DOWN or DEGRADED."
           }
         }
       },
       "MemoryHealth": {
         "type": "object",
+        "description": "JVM memory health status including heap and non-heap memory usage.",
         "properties": {
           "status": {
             "type": "string",
-            "enum": ["UP", "DOWN", "DEGRADED"]
+            "enum": ["UP", "DOWN", "DEGRADED"],
+            "description": "Memory status: UP (< 75% heap), DEGRADED (75-90% heap), DOWN (> 90% heap)."
           },
           "heap": {
             "$ref": "#/components/schemas/HeapMemory"
@@ -239,80 +467,103 @@
       },
       "HeapMemory": {
         "type": "object",
+        "description": "JVM heap memory usage details.",
         "properties": {
           "max": {
-            "type": "string"
+            "type": "string",
+            "description": "Maximum heap memory size (e.g., '4.00 GB')."
           },
           "used": {
-            "type": "string"
+            "type": "string",
+            "description": "Currently used heap memory (e.g., '512.00 MB')."
           },
           "committed": {
-            "type": "string"
+            "type": "string",
+            "description": "Committed heap memory guaranteed to be available (e.g., '1.00 GB')."
           },
           "usagePercent": {
-            "type": "string"
+            "type": "string",
+            "description": "Heap usage as a percentage of max (e.g., '12.50')."
           }
         }
       },
       "NonHeapMemory": {
         "type": "object",
+        "description": "JVM non-heap memory usage details (metaspace, code cache, etc.).",
         "properties": {
           "used": {
-            "type": "string"
+            "type": "string",
+            "description": "Currently used non-heap memory (e.g., '128.00 MB')."
           },
           "committed": {
-            "type": "string"
+            "type": "string",
+            "description": "Committed non-heap memory (e.g., '256.00 MB')."
           }
         }
       },
       "JvmHealth": {
         "type": "object",
+        "description": "JVM runtime information including thread counts, uptime, and garbage collection statistics.",
         "properties": {
           "availableProcessors": {
-            "type": "integer"
+            "type": "integer",
+            "description": "Number of available CPU processors."
           },
           "threadCount": {
-            "type": "integer"
+            "type": "integer",
+            "description": "Current number of live threads."
           },
           "peakThreadCount": {
-            "type": "integer"
+            "type": "integer",
+            "description": "Peak number of live threads since JVM start."
           },
           "uptime": {
-            "type": "string"
+            "type": "string",
+            "description": "JVM uptime in milliseconds (e.g., '3600000ms')."
           },
           "vmName": {
-            "type": "string"
+            "type": "string",
+            "description": "JVM name (e.g., 'OpenJDK 64-Bit Server VM')."
           },
           "vmVersion": {
-            "type": "string"
+            "type": "string",
+            "description": "JVM version (e.g., '17.0.1')."
           },
           "gcCollections": {
-            "type": "integer"
+            "type": "integer",
+            "description": "Total number of garbage collection collections across all GC beans."
           },
           "status": {
             "type": "string",
-            "enum": ["UP", "DOWN"]
+            "enum": ["UP", "DOWN"],
+            "description": "JVM status (always UP unless an unexpected error occurs)."
           }
         }
       },
       "EnvironmentHealth": {
         "type": "object",
+        "description": "Runtime environment information including temp directory, user directory, encoding, and locale.",
         "properties": {
           "tempDir": {
-            "type": "string"
+            "type": "string",
+            "description": "Temp directory status: 'writable', 'not writable', or an error message."
           },
           "userDir": {
-            "type": "string"
+            "type": "string",
+            "description": "Current working directory of the JVM process."
           },
           "fileEncoding": {
-            "type": "string"
+            "type": "string",
+            "description": "Default file encoding (e.g., 'UTF-8')."
           },
           "defaultLocale": {
-            "type": "string"
+            "type": "string",
+            "description": "Default locale (e.g., 'en_US')."
           },
           "status": {
             "type": "string",
-            "enum": ["UP", "DOWN"]
+            "enum": ["UP", "DOWN"],
+            "description": "Environment status (always UP unless an unexpected error occurs)."
           }
         }
       }

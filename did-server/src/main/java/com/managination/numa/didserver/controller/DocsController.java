@@ -14,14 +14,36 @@ import java.nio.charset.StandardCharsets;
 
 /**
  * Controller for serving API documentation.
+ * <p>
+ * Provides two endpoints under {@code /docs}:
+ * <ul>
+ *   <li>{@code GET /docs/openapi.json} - Returns the raw OpenAPI 3.0 specification in JSON format</li>
+ *   <li>{@code GET /docs} - Returns an interactive HTML documentation page</li>
+ * </ul>
+ * </p>
+ *
+ * @author Swiss Federal Chancellery
  */
 @RestController
 @RequestMapping("/docs")
 @Tag(name = "Documentation", description = "API documentation endpoints")
 public class DocsController {
 
+    /**
+     * Classpath location of the OpenAPI specification JSON file.
+     */
     private static final String OPENAPI_JSON_PATH = "openapi.json";
 
+    /**
+     * Retrieves the OpenAPI 3.0 specification for the DID Server API.
+     * <p>
+     * The specification is read from the classpath resource {@code openapi.json}
+     * and returned as a UTF-8 encoded JSON string.
+     * </p>
+     *
+     * @return a {@link ResponseEntity} containing the OpenAPI JSON specification
+     * @throws IOException if the classpath resource cannot be read
+     */
     @Operation(
         summary = "Get API documentation",
         description = "Returns the OpenAPI 3.0 specification for the DID Server API in JSON format"
@@ -33,6 +55,15 @@ public class DocsController {
         return ResponseEntity.ok(content);
     }
 
+    /**
+     * Returns an HTML page with interactive documentation for the DID Server API.
+     * <p>
+     * The page includes an overview of available endpoints, DID format specifications,
+     * error handling details, and navigation links to Swagger UI and the raw OpenAPI JSON.
+     * </p>
+     *
+     * @return a {@link ResponseEntity} containing the HTML documentation page
+     */
     @Operation(
         summary = "Get API documentation (HTML)",
         description = "Returns an HTML page with interactive documentation for the DID Server API"
