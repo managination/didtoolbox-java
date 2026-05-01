@@ -1,436 +1,613 @@
 {
-  "asyncapi": "3.1.0",
+  "asyncapi": "3.0.0",
   "info": {
-    "title": "DID Server WebSocket API",
-    "description": "WebSocket-based real-time communication for credential issuance sessions. The server acts as a relay between issuers and holders during the credential exchange process.\n\n## Session Flow\n\n1. **Issuer** creates a session via REST API (`POST /sessions`)\n2. **Issuer** connects to WebSocket at `/ws/session/{sessionId}`\n3. **Issuer** shares session ID with holder via QR code\n4. **Holder** scans QR code and connects to same WebSocket endpoint\n5. **Holder** sends their DID to the issuer through the server relay\n6. **Issuer** creates and signs the verifiable credential\n7. **Issuer** sends the credential through the server relay\n8. **Holder** receives and stores the credential\n9. **Session** is marked as completed and connections are closed",
-    "version": "2.0.0",
-    "contact": {
-      "name": "Numa Quest"
-    },
-    "license": {
-      "name": "Apache License 2.0"
-    },
-    "tags": [
-      {
-        "name": "issuance",
-        "description": "Credential issuance session channels"
-      }
-    ]
+    "title": "did-server",
+    "version": "1.0.0",
+    "description": "DID Server AsyncAPI documentation",
+    "x-generator": "springwolf"
   },
+  "defaultContentType": "application/json",
   "servers": {
-    "production": {
-      "host": "did.ninja",
-      "protocol": "wss",
-      "pathname": "/ws",
-      "description": "Production WebSocket server"
-    },
-    "development": {
+    "websocket-server": {
       "host": "localhost:8080",
-      "protocol": "ws",
-      "pathname": "/ws",
-      "description": "Local development WebSocket server"
+      "protocol": "ws"
     }
   },
   "channels": {
-    "session/{sessionId}": {
+    "_ws_session__sessionId_": {
       "address": "/ws/session/{sessionId}",
-      "description": "WebSocket channel for a specific credential issuance session. Both the issuer and holder connect to the same session endpoint using the session ID obtained from the REST API or QR code.",
+      "messages": {
+        "com.managination.numa.didserver.dto.websocket.CredentialMessage": {
+          "$ref": "#/components/messages/com.managination.numa.didserver.dto.websocket.CredentialMessage"
+        },
+        "com.managination.numa.didserver.dto.websocket.CredentialReceivedMessage": {
+          "$ref": "#/components/messages/com.managination.numa.didserver.dto.websocket.CredentialReceivedMessage"
+        },
+        "com.managination.numa.didserver.dto.websocket.ErrorMessage": {
+          "$ref": "#/components/messages/com.managination.numa.didserver.dto.websocket.ErrorMessage"
+        },
+        "com.managination.numa.didserver.dto.websocket.HolderDidMessage": {
+          "$ref": "#/components/messages/com.managination.numa.didserver.dto.websocket.HolderDidMessage"
+        },
+        "com.managination.numa.didserver.dto.websocket.JoinMessage": {
+          "$ref": "#/components/messages/com.managination.numa.didserver.dto.websocket.JoinMessage"
+        },
+        "com.managination.numa.didserver.dto.websocket.SessionCancelledMessage": {
+          "$ref": "#/components/messages/com.managination.numa.didserver.dto.websocket.SessionCancelledMessage"
+        },
+        "com.managination.numa.didserver.dto.websocket.SessionExpiredMessage": {
+          "$ref": "#/components/messages/com.managination.numa.didserver.dto.websocket.SessionExpiredMessage"
+        },
+        "com.managination.numa.didserver.dto.websocket.SessionReadyMessage": {
+          "$ref": "#/components/messages/com.managination.numa.didserver.dto.websocket.SessionReadyMessage"
+        }
+      },
       "parameters": {
         "sessionId": {
-          "description": "The unique session UUID created via POST /sessions",
-          "examples": ["550e8400-e29b-41d4-a716-446655440000"]
+          "description": "The unique session UUID created via POST /sessions"
         }
       },
-      "messages": {
-        "join": {
-          "summary": "Join a session",
-          "description": "Sent by either the issuer or holder when first connecting to the session. The server uses this to identify the role and track connection state.",
-          "payload": {
-            "$ref": "#/components/schemas/JoinMessage"
-          }
-        },
-        "holderDid": {
-          "summary": "Holder's DID",
-          "description": "Sent by the holder to the server, which relays it to the issuer. Contains the holder's DID string that will be used as the subject in the verifiable credential.",
-          "payload": {
-            "$ref": "#/components/schemas/HolderDidMessage"
-          }
-        },
-        "credential": {
-          "summary": "Issued credential",
-          "description": "Sent by the issuer to the server, which relays it to the holder. Contains the signed JWT verifiable credential.",
-          "payload": {
-            "$ref": "#/components/schemas/CredentialMessage"
-          }
-        },
-        "sessionReady": {
-          "summary": "Session ready",
-          "description": "Sent by the server to the issuer when a holder has successfully connected to the session.",
-          "payload": {
-            "$ref": "#/components/schemas/SessionReadyMessage"
-          }
-        },
-        "credentialReceived": {
-          "summary": "Credential received",
-          "description": "Sent by the server to the issuer to confirm the holder has received the credential.",
-          "payload": {
-            "$ref": "#/components/schemas/CredentialReceivedMessage"
-          }
-        },
-        "error": {
-          "summary": "Error",
-          "description": "Sent by the server to either party when an error occurs during the session.",
-          "payload": {
-            "$ref": "#/components/schemas/ErrorMessage"
-          }
-        },
-        "sessionExpired": {
-          "summary": "Session expired",
-          "description": "Sent by the server to both parties when the session times out.",
-          "payload": {
-            "$ref": "#/components/schemas/SessionExpiredMessage"
-          }
-        },
-        "sessionCancelled": {
-          "summary": "Session cancelled",
-          "description": "Sent by the server to the holder when the issuer cancels the session.",
-          "payload": {
-            "$ref": "#/components/schemas/SessionCancelledMessage"
-          }
-        }
-      }
-    }
-  },
-  "operations": {
-    "sendJoin": {
-      "action": "send",
-      "summary": "Client sends a join message to connect to the session",
-      "description": "Both issuer and holder send this message when first connecting to identify their role.",
-      "channel": {
-        "$ref": "#/channels/session~1{sessionId}"
-      },
-      "messages": [
-        {
-          "$ref": "#/channels/session~1{sessionId}/messages/join"
-        }
-      ]
-    },
-    "sendHolderDid": {
-      "action": "send",
-      "summary": "Holder sends their DID to the issuer",
-      "description": "After joining, the holder sends their DID which the server relays to the issuer.",
-      "channel": {
-        "$ref": "#/channels/session~1{sessionId}"
-      },
-      "messages": [
-        {
-          "$ref": "#/channels/session~1{sessionId}/messages/holderDid"
-        }
-      ]
-    },
-    "sendCredential": {
-      "action": "send",
-      "summary": "Issuer sends the credential to the holder",
-      "description": "After receiving the holder's DID, the issuer creates and sends the credential.",
-      "channel": {
-        "$ref": "#/channels/session~1{sessionId}"
-      },
-      "messages": [
-        {
-          "$ref": "#/channels/session~1{sessionId}/messages/credential"
-        }
-      ]
-    },
-    "receiveSessionReady": {
-      "action": "receive",
-      "summary": "Issuer receives notification that holder has connected",
-      "description": "Server sends this to the issuer when a holder joins the session.",
-      "channel": {
-        "$ref": "#/channels/session~1{sessionId}"
-      },
-      "messages": [
-        {
-          "$ref": "#/channels/session~1{sessionId}/messages/sessionReady"
-        }
-      ]
-    },
-    "receiveHolderDid": {
-      "action": "receive",
-      "summary": "Issuer receives the holder's DID",
-      "description": "Server relays the holder's DID to the issuer.",
-      "channel": {
-        "$ref": "#/channels/session~1{sessionId}"
-      },
-      "messages": [
-        {
-          "$ref": "#/channels/session~1{sessionId}/messages/holderDid"
-        }
-      ]
-    },
-    "receiveCredential": {
-      "action": "receive",
-      "summary": "Holder receives the issued credential",
-      "description": "Server relays the credential from the issuer to the holder.",
-      "channel": {
-        "$ref": "#/channels/session~1{sessionId}"
-      },
-      "messages": [
-        {
-          "$ref": "#/channels/session~1{sessionId}/messages/credential"
-        }
-      ]
-    },
-    "receiveCredentialReceived": {
-      "action": "receive",
-      "summary": "Issuer receives confirmation that holder got the credential",
-      "description": "Server sends this to the issuer after the holder acknowledges receipt.",
-      "channel": {
-        "$ref": "#/channels/session~1{sessionId}"
-      },
-      "messages": [
-        {
-          "$ref": "#/channels/session~1{sessionId}/messages/credentialReceived"
-        }
-      ]
-    },
-    "receiveError": {
-      "action": "receive",
-      "summary": "Client receives an error message",
-      "description": "Server sends this when something goes wrong during the session.",
-      "channel": {
-        "$ref": "#/channels/session~1{sessionId}"
-      },
-      "messages": [
-        {
-          "$ref": "#/channels/session~1{sessionId}/messages/error"
-        }
-      ]
-    },
-    "receiveSessionExpired": {
-      "action": "receive",
-      "summary": "Client receives session expired notification",
-      "description": "Server sends this to both parties when the session times out.",
-      "channel": {
-        "$ref": "#/channels/session~1{sessionId}"
-      },
-      "messages": [
-        {
-          "$ref": "#/channels/session~1{sessionId}/messages/sessionExpired"
-        }
-      ]
-    },
-    "receiveSessionCancelled": {
-      "action": "receive",
-      "summary": "Holder receives session cancelled notification",
-      "description": "Server sends this to the holder when the issuer cancels the session.",
-      "channel": {
-        "$ref": "#/channels/session~1{sessionId}"
-      },
-      "messages": [
-        {
-          "$ref": "#/channels/session~1{sessionId}/messages/sessionCancelled"
-        }
-      ]
+      "bindings": {}
     }
   },
   "components": {
     "schemas": {
-      "BaseMessage": {
+      "HeadersNotDocumented": {
+        "title": "HeadersNotDocumented",
         "type": "object",
-        "description": "Base message structure for all WebSocket messages.",
+        "properties": {},
+        "description": "There can be headers, but they are not explicitly documented.",
+        "examples": [
+          {}
+        ]
+      },
+      "com.managination.numa.didserver.dto.websocket.CredentialMessage": {
+        "title": "CredentialMessage",
+        "type": "object",
         "properties": {
-          "type": {
+          "credential": {
             "type": "string",
-            "description": "Message type identifier"
+            "description": "The signed JWT verifiable credential"
+          },
+          "format": {
+            "type": "string",
+            "description": "Credential format (e.g., jwt_vc_json)"
           },
           "sessionId": {
             "type": "string",
-            "format": "uuid",
             "description": "The session this message belongs to"
           },
           "timestamp": {
             "type": "string",
-            "format": "date-time",
             "description": "ISO-8601 timestamp of when the message was created"
+          },
+          "type": {
+            "type": "string",
+            "description": "Message type identifier",
+            "examples": [
+              "credential"
+            ]
           }
         },
-        "required": ["type", "sessionId"]
-      },
-      "JoinMessage": {
-        "allOf": [
-          { "$ref": "#/components/schemas/BaseMessage" },
+        "description": "Sent by the issuer to the server, which relays it to the holder. Contains the signed JWT verifiable credential.",
+        "examples": [
           {
-            "type": "object",
-            "properties": {
-              "type": {
-                "type": "string",
-                "const": "join"
-              },
-              "role": {
-                "type": "string",
-                "enum": ["issuer", "holder"],
-                "description": "The role of the connecting party"
-              }
-            },
-            "required": ["type", "sessionId", "role"]
+            "credential": "string",
+            "format": "jwt_vc_json",
+            "sessionId": "string",
+            "timestamp": "string",
+            "type": "credential"
           }
+        ],
+        "required": [
+          "credential",
+          "sessionId",
+          "type"
         ]
       },
-      "HolderDidMessage": {
-        "allOf": [
-          { "$ref": "#/components/schemas/BaseMessage" },
-          {
-            "type": "object",
-            "properties": {
-              "type": {
-                "type": "string",
-                "const": "holder_did"
-              },
-              "did": {
-                "type": "string",
-                "description": "The holder's DID string (e.g., did:webvh:SCID:holder.did.ninja)",
-                "pattern": "^did:webvh:.+"
-              }
-            },
-            "required": ["type", "sessionId", "did"]
+      "com.managination.numa.didserver.dto.websocket.CredentialReceivedMessage": {
+        "title": "CredentialReceivedMessage",
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "description": "The session this message belongs to"
+          },
+          "timestamp": {
+            "type": "string",
+            "description": "ISO-8601 timestamp of when the message was created"
+          },
+          "type": {
+            "type": "string",
+            "description": "Message type identifier",
+            "examples": [
+              "credential_received"
+            ]
           }
+        },
+        "description": "Sent by the server to the issuer to confirm the holder has received the credential.",
+        "examples": [
+          {
+            "sessionId": "string",
+            "timestamp": "string",
+            "type": "credential_received"
+          }
+        ],
+        "required": [
+          "sessionId",
+          "type"
         ]
       },
-      "CredentialMessage": {
-        "allOf": [
-          { "$ref": "#/components/schemas/BaseMessage" },
-          {
-            "type": "object",
-            "properties": {
-              "type": {
-                "type": "string",
-                "const": "credential"
-              },
-              "credential": {
-                "type": "string",
-                "description": "The signed JWT verifiable credential"
-              },
-              "format": {
-                "type": "string",
-                "description": "Credential format (e.g., jwt_vc_json)",
-                "default": "jwt_vc_json"
-              }
-            },
-            "required": ["type", "sessionId", "credential"]
+      "com.managination.numa.didserver.dto.websocket.ErrorMessage": {
+        "title": "ErrorMessage",
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Error code for programmatic handling",
+            "enum": [
+              "INVALID_MESSAGE",
+              "UNAUTHORIZED",
+              "SESSION_NOT_FOUND",
+              "SESSION_EXPIRED",
+              "DUPLICATE_JOIN",
+              "ROLE_MISMATCH",
+              "INVALID_DID",
+              "INVALID_CREDENTIAL",
+              "INTERNAL_ERROR",
+              "MESSAGE_TOO_LARGE",
+              "INVALID_FORMAT"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "description": "Human-readable error description"
+          },
+          "sessionId": {
+            "type": "string",
+            "description": "The session this message belongs to"
+          },
+          "timestamp": {
+            "type": "string",
+            "description": "ISO-8601 timestamp of when the message was created"
+          },
+          "type": {
+            "type": "string",
+            "description": "Message type identifier",
+            "examples": [
+              "error"
+            ]
           }
+        },
+        "description": "Sent by the server to either party when an error occurs during the session.",
+        "examples": [
+          {
+            "code": "INVALID_MESSAGE",
+            "message": "string",
+            "sessionId": "string",
+            "timestamp": "string",
+            "type": "error"
+          }
+        ],
+        "required": [
+          "code",
+          "message",
+          "sessionId",
+          "type"
         ]
       },
-      "SessionReadyMessage": {
-        "allOf": [
-          { "$ref": "#/components/schemas/BaseMessage" },
-          {
-            "type": "object",
-            "properties": {
-              "type": {
-                "type": "string",
-                "const": "session_ready"
-              }
-            },
-            "required": ["type", "sessionId"]
+      "com.managination.numa.didserver.dto.websocket.HolderDidMessage": {
+        "title": "HolderDidMessage",
+        "type": "object",
+        "properties": {
+          "did": {
+            "pattern": "^did:webvh:.+",
+            "type": "string",
+            "description": "The holder's DID string (e.g., did:webvh:SCID:holder.did.ninja)"
+          },
+          "sessionId": {
+            "type": "string",
+            "description": "The session this message belongs to"
+          },
+          "timestamp": {
+            "type": "string",
+            "description": "ISO-8601 timestamp of when the message was created"
+          },
+          "type": {
+            "type": "string",
+            "description": "Message type identifier",
+            "examples": [
+              "holder_did"
+            ]
           }
+        },
+        "description": "Sent by the holder to the server, which relays it to the issuer. Contains the holder's DID string.",
+        "examples": [
+          {
+            "did": "string",
+            "sessionId": "string",
+            "timestamp": "string",
+            "type": "holder_did"
+          }
+        ],
+        "required": [
+          "did",
+          "sessionId",
+          "type"
         ]
       },
-      "CredentialReceivedMessage": {
-        "allOf": [
-          { "$ref": "#/components/schemas/BaseMessage" },
-          {
-            "type": "object",
-            "properties": {
-              "type": {
-                "type": "string",
-                "const": "credential_received"
-              }
-            },
-            "required": ["type", "sessionId"]
+      "com.managination.numa.didserver.dto.websocket.JoinMessage": {
+        "title": "JoinMessage",
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "string",
+            "description": "The role of the connecting party",
+            "enum": [
+              "issuer",
+              "holder"
+            ]
+          },
+          "sessionId": {
+            "type": "string",
+            "description": "The session this message belongs to"
+          },
+          "timestamp": {
+            "type": "string",
+            "description": "ISO-8601 timestamp of when the message was created"
+          },
+          "type": {
+            "type": "string",
+            "description": "Message type identifier",
+            "examples": [
+              "join"
+            ]
           }
+        },
+        "description": "Sent by either the issuer or holder when first connecting to the session.",
+        "examples": [
+          {
+            "role": "issuer",
+            "sessionId": "string",
+            "timestamp": "string",
+            "type": "join"
+          }
+        ],
+        "required": [
+          "role",
+          "sessionId",
+          "type"
         ]
       },
-      "ErrorMessage": {
-        "allOf": [
-          { "$ref": "#/components/schemas/BaseMessage" },
-          {
-            "type": "object",
-            "properties": {
-              "type": {
-                "type": "string",
-                "const": "error"
-              },
-              "code": {
-                "type": "string",
-                "description": "Error code for programmatic handling",
-                "enum": [
-                  "INVALID_MESSAGE",
-                  "UNAUTHORIZED",
-                  "SESSION_NOT_FOUND",
-                  "DUPLICATE_JOIN",
-                  "ROLE_MISMATCH",
-                  "INVALID_DID",
-                  "INVALID_CREDENTIAL",
-                  "INVALID_FORMAT",
-                  "MESSAGE_TOO_LARGE",
-                  "INTERNAL_ERROR"
-                ]
-              },
-              "message": {
-                "type": "string",
-                "description": "Human-readable error description"
-              }
-            },
-            "required": ["type", "sessionId", "code", "message"]
+      "com.managination.numa.didserver.dto.websocket.SessionCancelledMessage": {
+        "title": "SessionCancelledMessage",
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "Human-readable cancellation notice"
+          },
+          "sessionId": {
+            "type": "string",
+            "description": "The session this message belongs to"
+          },
+          "timestamp": {
+            "type": "string",
+            "description": "ISO-8601 timestamp of when the message was created"
+          },
+          "type": {
+            "type": "string",
+            "description": "Message type identifier",
+            "examples": [
+              "session_cancelled"
+            ]
           }
+        },
+        "description": "Sent by the server to the holder when the issuer cancels the session.",
+        "examples": [
+          {
+            "message": "Session was cancelled by the issuer",
+            "sessionId": "string",
+            "timestamp": "string",
+            "type": "session_cancelled"
+          }
+        ],
+        "required": [
+          "sessionId",
+          "type"
         ]
       },
-      "SessionExpiredMessage": {
-        "allOf": [
-          { "$ref": "#/components/schemas/BaseMessage" },
-          {
-            "type": "object",
-            "properties": {
-              "type": {
-                "type": "string",
-                "const": "session_expired"
-              },
-              "message": {
-                "type": "string",
-                "description": "Human-readable expiration notice",
-                "default": "Session has expired due to inactivity"
-              }
-            },
-            "required": ["type", "sessionId"]
+      "com.managination.numa.didserver.dto.websocket.SessionExpiredMessage": {
+        "title": "SessionExpiredMessage",
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "Human-readable expiration notice"
+          },
+          "sessionId": {
+            "type": "string",
+            "description": "The session this message belongs to"
+          },
+          "timestamp": {
+            "type": "string",
+            "description": "ISO-8601 timestamp of when the message was created"
+          },
+          "type": {
+            "type": "string",
+            "description": "Message type identifier",
+            "examples": [
+              "session_expired"
+            ]
           }
+        },
+        "description": "Sent by the server to both parties when the session times out.",
+        "examples": [
+          {
+            "message": "Session has expired due to inactivity",
+            "sessionId": "string",
+            "timestamp": "string",
+            "type": "session_expired"
+          }
+        ],
+        "required": [
+          "sessionId",
+          "type"
         ]
       },
-      "SessionCancelledMessage": {
-        "allOf": [
-          { "$ref": "#/components/schemas/BaseMessage" },
-          {
-            "type": "object",
-            "properties": {
-              "type": {
-                "type": "string",
-                "const": "session_cancelled"
-              },
-              "message": {
-                "type": "string",
-                "description": "Human-readable cancellation notice",
-                "default": "Session was cancelled by the issuer"
-              }
-            },
-            "required": ["type", "sessionId"]
+      "com.managination.numa.didserver.dto.websocket.SessionReadyMessage": {
+        "title": "SessionReadyMessage",
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "description": "The session this message belongs to"
+          },
+          "timestamp": {
+            "type": "string",
+            "description": "ISO-8601 timestamp of when the message was created"
+          },
+          "type": {
+            "type": "string",
+            "description": "Message type identifier",
+            "examples": [
+              "session_ready"
+            ]
           }
+        },
+        "description": "Sent by the server to the issuer when a holder has successfully connected to the session.",
+        "examples": [
+          {
+            "sessionId": "string",
+            "timestamp": "string",
+            "type": "session_ready"
+          }
+        ],
+        "required": [
+          "sessionId",
+          "type"
         ]
       }
     },
-    "correlationIds": {
-      "sessionCorrelationId": {
-        "description": "The session ID correlates all messages within a single credential issuance session",
-        "location": "$message.payload#/sessionId"
+    "messages": {
+      "com.managination.numa.didserver.dto.websocket.CredentialMessage": {
+        "headers": {
+          "$ref": "#/components/schemas/HeadersNotDocumented"
+        },
+        "payload": {
+          "schemaFormat": "application/vnd.aai.asyncapi+json;version=3.0.0",
+          "schema": {
+            "$ref": "#/components/schemas/com.managination.numa.didserver.dto.websocket.CredentialMessage"
+          }
+        },
+        "name": "CredentialMessage",
+        "title": "CredentialMessage",
+        "description": "Issued credential",
+        "bindings": {}
+      },
+      "com.managination.numa.didserver.dto.websocket.CredentialReceivedMessage": {
+        "headers": {
+          "$ref": "#/components/schemas/HeadersNotDocumented"
+        },
+        "payload": {
+          "schemaFormat": "application/vnd.aai.asyncapi+json;version=3.0.0",
+          "schema": {
+            "$ref": "#/components/schemas/com.managination.numa.didserver.dto.websocket.CredentialReceivedMessage"
+          }
+        },
+        "name": "CredentialReceivedMessage",
+        "title": "CredentialReceivedMessage",
+        "description": "Credential received",
+        "bindings": {}
+      },
+      "com.managination.numa.didserver.dto.websocket.ErrorMessage": {
+        "headers": {
+          "$ref": "#/components/schemas/HeadersNotDocumented"
+        },
+        "payload": {
+          "schemaFormat": "application/vnd.aai.asyncapi+json;version=3.0.0",
+          "schema": {
+            "$ref": "#/components/schemas/com.managination.numa.didserver.dto.websocket.ErrorMessage"
+          }
+        },
+        "name": "ErrorMessage",
+        "title": "ErrorMessage",
+        "description": "Error",
+        "bindings": {}
+      },
+      "com.managination.numa.didserver.dto.websocket.HolderDidMessage": {
+        "headers": {
+          "$ref": "#/components/schemas/HeadersNotDocumented"
+        },
+        "payload": {
+          "schemaFormat": "application/vnd.aai.asyncapi+json;version=3.0.0",
+          "schema": {
+            "$ref": "#/components/schemas/com.managination.numa.didserver.dto.websocket.HolderDidMessage"
+          }
+        },
+        "name": "HolderDidMessage",
+        "title": "HolderDidMessage",
+        "description": "Holder's DID",
+        "bindings": {}
+      },
+      "com.managination.numa.didserver.dto.websocket.JoinMessage": {
+        "headers": {
+          "$ref": "#/components/schemas/HeadersNotDocumented"
+        },
+        "payload": {
+          "schemaFormat": "application/vnd.aai.asyncapi+json;version=3.0.0",
+          "schema": {
+            "$ref": "#/components/schemas/com.managination.numa.didserver.dto.websocket.JoinMessage"
+          }
+        },
+        "name": "JoinMessage",
+        "title": "JoinMessage",
+        "description": "Join a session",
+        "bindings": {}
+      },
+      "com.managination.numa.didserver.dto.websocket.SessionCancelledMessage": {
+        "headers": {
+          "$ref": "#/components/schemas/HeadersNotDocumented"
+        },
+        "payload": {
+          "schemaFormat": "application/vnd.aai.asyncapi+json;version=3.0.0",
+          "schema": {
+            "$ref": "#/components/schemas/com.managination.numa.didserver.dto.websocket.SessionCancelledMessage"
+          }
+        },
+        "name": "SessionCancelledMessage",
+        "title": "SessionCancelledMessage",
+        "description": "Session cancelled",
+        "bindings": {}
+      },
+      "com.managination.numa.didserver.dto.websocket.SessionExpiredMessage": {
+        "headers": {
+          "$ref": "#/components/schemas/HeadersNotDocumented"
+        },
+        "payload": {
+          "schemaFormat": "application/vnd.aai.asyncapi+json;version=3.0.0",
+          "schema": {
+            "$ref": "#/components/schemas/com.managination.numa.didserver.dto.websocket.SessionExpiredMessage"
+          }
+        },
+        "name": "SessionExpiredMessage",
+        "title": "SessionExpiredMessage",
+        "description": "Session expired",
+        "bindings": {}
+      },
+      "com.managination.numa.didserver.dto.websocket.SessionReadyMessage": {
+        "headers": {
+          "$ref": "#/components/schemas/HeadersNotDocumented"
+        },
+        "payload": {
+          "schemaFormat": "application/vnd.aai.asyncapi+json;version=3.0.0",
+          "schema": {
+            "$ref": "#/components/schemas/com.managination.numa.didserver.dto.websocket.SessionReadyMessage"
+          }
+        },
+        "name": "SessionReadyMessage",
+        "title": "SessionReadyMessage",
+        "description": "Session ready",
+        "bindings": {}
       }
+    }
+  },
+  "operations": {
+    "_ws_session__sessionId__receive_handleTextMessage": {
+      "action": "receive",
+      "channel": {
+        "$ref": "#/channels/_ws_session__sessionId_"
+      },
+      "title": "_ws_session__sessionId__receive",
+      "description": "Client sends a join request to identify their role (issuer or holder).",
+      "bindings": {},
+      "messages": [
+        {
+          "$ref": "#/channels/_ws_session__sessionId_/messages/com.managination.numa.didserver.dto.websocket.CredentialMessage"
+        },
+        {
+          "$ref": "#/channels/_ws_session__sessionId_/messages/com.managination.numa.didserver.dto.websocket.HolderDidMessage"
+        },
+        {
+          "$ref": "#/channels/_ws_session__sessionId_/messages/com.managination.numa.didserver.dto.websocket.JoinMessage"
+        }
+      ]
+    },
+    "_ws_session__sessionId__send_notifySessionCancelled": {
+      "action": "send",
+      "channel": {
+        "$ref": "#/channels/_ws_session__sessionId_"
+      },
+      "title": "_ws_session__sessionId__send",
+      "description": "Server sends this to the holder when the issuer cancels the session.",
+      "bindings": {},
+      "messages": [
+        {
+          "$ref": "#/channels/_ws_session__sessionId_/messages/com.managination.numa.didserver.dto.websocket.SessionCancelledMessage"
+        }
+      ]
+    },
+    "_ws_session__sessionId__send_notifySessionExpired": {
+      "action": "send",
+      "channel": {
+        "$ref": "#/channels/_ws_session__sessionId_"
+      },
+      "title": "_ws_session__sessionId__send",
+      "description": "Server sends this to both parties when the session times out.",
+      "bindings": {},
+      "messages": [
+        {
+          "$ref": "#/channels/_ws_session__sessionId_/messages/com.managination.numa.didserver.dto.websocket.SessionExpiredMessage"
+        }
+      ]
+    },
+    "_ws_session__sessionId__send_sendError": {
+      "action": "send",
+      "channel": {
+        "$ref": "#/channels/_ws_session__sessionId_"
+      },
+      "title": "_ws_session__sessionId__send",
+      "description": "Server sends this when something goes wrong during the session.",
+      "bindings": {},
+      "messages": [
+        {
+          "$ref": "#/channels/_ws_session__sessionId_/messages/com.managination.numa.didserver.dto.websocket.ErrorMessage"
+        }
+      ]
+    },
+    "_ws_session__sessionId__send_sendToHolder": {
+      "action": "send",
+      "channel": {
+        "$ref": "#/channels/_ws_session__sessionId_"
+      },
+      "title": "_ws_session__sessionId__send",
+      "description": "Server relays the credential from the issuer to the holder.",
+      "bindings": {},
+      "messages": [
+        {
+          "$ref": "#/channels/_ws_session__sessionId_/messages/com.managination.numa.didserver.dto.websocket.CredentialMessage"
+        }
+      ]
+    },
+    "_ws_session__sessionId__send_sendToIssuer": {
+      "action": "send",
+      "channel": {
+        "$ref": "#/channels/_ws_session__sessionId_"
+      },
+      "title": "_ws_session__sessionId__send",
+      "description": "Server sends this to the issuer when a holder joins the session.",
+      "bindings": {},
+      "messages": [
+        {
+          "$ref": "#/channels/_ws_session__sessionId_/messages/com.managination.numa.didserver.dto.websocket.CredentialReceivedMessage"
+        },
+        {
+          "$ref": "#/channels/_ws_session__sessionId_/messages/com.managination.numa.didserver.dto.websocket.HolderDidMessage"
+        },
+        {
+          "$ref": "#/channels/_ws_session__sessionId_/messages/com.managination.numa.didserver.dto.websocket.SessionReadyMessage"
+        }
+      ]
     }
   }
 }
