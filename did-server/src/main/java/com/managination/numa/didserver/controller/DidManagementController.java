@@ -1,0 +1,113 @@
+package com.managination.numa.didserver.controller;
+
+import com.managination.numa.didserver.dto.*;
+import com.managination.numa.didserver.model.DidDocument;
+import com.managination.numa.didserver.service.DidService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
+
+@RestController
+@RequestMapping("/did")
+@Tag(name = "DID Management", description = "Endpoints for creating, registering, updating, and retrieving DID documents")
+public class DidManagementController {
+
+    private final DidService didService;
+
+    public DidManagementController(DidService didService) {
+        this.didService = didService;
+    }
+
+    @PostMapping
+    @Operation(summary = "Register a new DID with the server", operationId = "registerDid")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "DID registered successfully",
+            content = @Content(schema = @Schema(implementation = DidRegistrationResponse.class))),
+        @ApiResponse(responseCode = "400", description = "Invalid DID registration request",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+        @ApiResponse(responseCode = "409", description = "DID already exists with different document",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    })
+    public ResponseEntity<?> registerDid(@RequestBody DidRegistrationRequest request) {
+        try {
+            DidRegistrationResponse response = didService.registerDid(request);
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(new ErrorResponse("invalid_request", e.getMessage()));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(new ErrorResponse("conflict", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(new ErrorResponse("registration_failed", e.getMessage()));
+        }
+    }
+
+    @GetMapping("/{did}")
+    @Operation(summary = "Resolve a DID to its document", operationId = "resolveDid")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "DID document found",
+            content = @Content(schema = @Schema(implementation = DidDocument.class))),
+        @ApiResponse(responseCode = "404", description = "DID not found",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    })
+    public ResponseEntity<?> resolveDid(
+            @Parameter(description = "URL-encoded DID string", required = true)
+            @PathVariable String did) {
+        try {
+            String decodedDid = URLDecoder.decode(did, StandardCharsets.UTF_8);
+            DidDocument document = didService.resolveDid(decodedDid);
+            return ResponseEntity.ok(document);
+        } catch (DidService.DidNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ErrorResponse("not_found", e.getMessage()));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(new ErrorResponse("invalid_did", e.getMessage()));
+        }
+    }
+
+    @PutMapping("/{did}/update")
+    @Operation(summary = "Update an existing DID document", operationId = "updateDid")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "DID document updated successfully",
+            content = @Content(schema = @Schema(implementation = DidUpdateResponse.class))),
+        @ApiResponse(responseCode = "400", description = "Invalid update request",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+        @ApiResponse(responseCode = "403", description = "Unauthorized - proof verification failed",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+        @ApiResponse(responseCode = "409", description = "Version conflict - server has newer version",
+            content = @Content(schema = @Schema(implementation = VersionConflictResponse.class)))
+    })
+    public ResponseEntity<?> updateDid(
+            @Parameter(description = "URL-encoded DID string", required = true)
+            @PathVariable String did,
+            @RequestBody DidUpdateRequest request) {
+        try {
+            String decodedDid = URLDecoder.decode(did, StandardCharsets.UTF_8);
+            DidUpdateResponse response = didService.updateDid(decodedDid, request);
+            return ResponseEntity.ok(response);
+        } catch (DidService.DidNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ErrorResponse("not_found", e.getMessage()));
+        } catch (DidService.VersionConflictException e) {
+            VersionConflictResponse conflict = new VersionConflictResponse(
+                "version_conflict",
+                e.getMessage(),
+                e.getServerVersionId(),
+                e.getClientVersionId(),
+                e.getServerDocument()
+            );
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(conflict);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(new ErrorResponse("invalid_request", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(new ErrorResponse("update_failed", e.getMessage()));
+        }
+    }
+}

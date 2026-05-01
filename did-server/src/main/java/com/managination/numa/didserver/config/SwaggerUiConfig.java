@@ -17,10 +17,11 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * Spring configuration class that registers Swagger UI resources and filters.
+ * Spring configuration class that registers Swagger UI and Springwolf UI resources and filters.
  * <p>
  * This configuration enables Swagger UI to be served from the {@code /swagger-ui} path
- * by intercepting requests and serving static resources from the Swagger UI webjars classpath.
+ * and Springwolf UI from the {@code /springwolf-ui} path by intercepting requests and
+ * serving static resources from the classpath.
  * </p>
  *
  * @author Swiss Federal Chancellery
@@ -29,92 +30,110 @@ import java.util.Set;
 public class SwaggerUiConfig {
 
    /**
-    * Set of static resource file paths required by Swagger UI (CSS, JS, favicons).
-    * These paths are matched to determine whether a request should be handled by the
-    * Swagger UI filter or passed through to the rest of the application.
+    * Classpath prefix where Swagger UI static resources are located within the webjars.
     */
-   private static final Set<String> SWAGGER_UI_RESOURCES = Set.of(
-         "/index.css",
-         "/swagger-ui.css",
-         "/swagger-ui-bundle.js",
-         "/swagger-ui-standalone-preset.js",
-         "/swagger-initializer.js",
-         "/favicon-32x32.png",
-         "/favicon-16x16.png"
-   );
+   private static final String SWAGGER_UI_CLASSPATH = "/META-INF/resources/webjars/swagger-ui/5.10.3/";
 
    /**
-    * Registers the {@link SwaggerUiFilter} to handle all incoming requests ({@code /*}).
-    * The filter intercepts Swagger UI-related requests and serves the appropriate static
-    * resources from the classpath.
+    * Classpath prefix where Springwolf UI static resources are located.
+    */
+   private static final String SPRINGWOLF_UI_CLASSPATH = "/META-INF/resources/springwolf/";
+
+   /**
+    * Registers the {@link UiResourcesFilter} to handle all incoming requests ({@code /*}).
+    * The filter intercepts Swagger UI and Springwolf UI requests and serves the appropriate
+    * static resources from the classpath.
     *
-    * @return a {@link FilterRegistrationBean} configured with the Swagger UI filter
+    * @return a {@link FilterRegistrationBean} configured with the UI resources filter
     */
    @Bean
-   public FilterRegistrationBean<SwaggerUiFilter> swaggerUiFilterRegistration() {
-      System.out.println("SwaggerUiConfig: Registering SwaggerUiFilter with pattern /*");
-      FilterRegistrationBean<SwaggerUiFilter> registration = new FilterRegistrationBean<>();
-      registration.setFilter(new SwaggerUiFilter());
+   public FilterRegistrationBean<UiResourcesFilter> uiResourcesFilterRegistration() {
+      System.out.println("SwaggerUiConfig: Registering UiResourcesFilter with pattern /*");
+      FilterRegistrationBean<UiResourcesFilter> registration = new FilterRegistrationBean<>();
+      registration.setFilter(new UiResourcesFilter());
       registration.addUrlPatterns("/*");
       registration.setOrder(0);
       return registration;
    }
 
    /**
-    * Servlet filter that intercepts requests for Swagger UI resources and serves them
-    * from the classpath-based webjars location.
+    * Servlet filter that intercepts requests for Swagger UI and Springwolf UI resources
+    * and serves them from the classpath.
     * <p>
-    * Requests matching the {@code /swagger-ui} prefix or known Swagger UI resource paths
+    * Requests matching the {@code /swagger-ui} or {@code /springwolf-ui} prefixes
     * are handled by this filter. All other requests are passed through the filter chain.
     * </p>
     */
-   public static class SwaggerUiFilter implements Filter {
+   public static class UiResourcesFilter implements Filter {
+
+      private static final Logger log = LoggerFactory.getLogger(UiResourcesFilter.class);
 
       /**
-       * Classpath prefix where Swagger UI static resources are located within the webjars.
+       * Set of static resource file paths required by Swagger UI (CSS, JS, favicons).
        */
-      private static final String SWAGGER_UI_CLASSPATH = "/META-INF/resources/webjars/swagger-ui/5.10.3/";
-
-      private static final Logger log = LoggerFactory.getLogger(SwaggerUiFilter.class);
+      private static final Set<String> SWAGGER_UI_RESOURCES = Set.of(
+            "/index.css",
+            "/swagger-ui.css",
+            "/swagger-ui-bundle.js",
+            "/swagger-ui-standalone-preset.js",
+            "/swagger-initializer.js",
+            "/favicon-32x32.png",
+            "/favicon-16x16.png"
+      );
 
       /**
-       * Spring resource handler configured to serve static resources from the Swagger UI classpath.
+       * Set of static resource file paths required by Springwolf UI.
        */
-      private final ResourceHttpRequestHandler handler;
+      private static final Set<String> SPRINGWOLF_UI_RESOURCES = Set.of(
+            "/asyncapi-ui.html",
+            "/styles-2J4TNLOB.css",
+            "/main-6CAHIZNX.js",
+            "/chunk-KX354HZD.js",
+            "/chunk-6Y76BSYC.js",
+            "/prerendered-routes.json",
+            "/3rdpartylicenses.txt"
+      );
 
       /**
-       * Constructs the filter and initializes the {@link ResourceHttpRequestHandler}
-       * with the Swagger UI classpath location and a {@link PathResourceResolver}.
+       * Spring resource handler for Swagger UI static resources.
+       */
+      private final ResourceHttpRequestHandler swaggerHandler;
+
+      /**
+       * Spring resource handler for Springwolf UI static resources.
+       */
+      private final ResourceHttpRequestHandler springwolfHandler;
+
+      /**
+       * Constructs the filter and initializes both resource handlers.
        *
-       * @throws RuntimeException if the resource handler fails to initialize
+       * @throws RuntimeException if a resource handler fails to initialize
        */
-      public SwaggerUiFilter() {
-         System.out.println("SwaggerUiFilter: Constructor called");
-         log.info("SwaggerUiFilter: Constructor called");
-         this.handler = new ResourceHttpRequestHandler();
-         this.handler.setLocations(List.of(new ClassPathResource(SWAGGER_UI_CLASSPATH)));
-         this.handler.setResourceResolvers(List.of(new PathResourceResolver()));
+      public UiResourcesFilter() {
+         System.out.println("UiResourcesFilter: Constructor called");
+         log.info("UiResourcesFilter: Constructor called");
+
+         // Initialize Swagger UI handler
+         this.swaggerHandler = new ResourceHttpRequestHandler();
+         this.swaggerHandler.setLocations(List.of(new ClassPathResource(SWAGGER_UI_CLASSPATH)));
+         this.swaggerHandler.setResourceResolvers(List.of(new PathResourceResolver()));
          try {
-            this.handler.afterPropertiesSet();
+            this.swaggerHandler.afterPropertiesSet();
          } catch (Exception e) {
             throw new RuntimeException("Failed to initialize SwaggerUiResourceHttpRequestHandler", e);
          }
+
+         // Initialize Springwolf UI handler
+         this.springwolfHandler = new ResourceHttpRequestHandler();
+         this.springwolfHandler.setLocations(List.of(new ClassPathResource(SPRINGWOLF_UI_CLASSPATH)));
+         this.springwolfHandler.setResourceResolvers(List.of(new PathResourceResolver()));
+         try {
+            this.springwolfHandler.afterPropertiesSet();
+         } catch (Exception e) {
+            throw new RuntimeException("Failed to initialize SpringwolfUiResourceHttpRequestHandler", e);
+         }
       }
 
-      /**
-       * Processes each request, determining whether it is a Swagger UI resource request.
-       * <p>
-       * If the request targets a Swagger UI resource, the filter maps the request path
-       * to the appropriate classpath resource and handles it directly. Otherwise, the
-       * request is passed to the next filter in the chain.
-       * </p>
-       *
-       * @param servletRequest  the incoming servlet request
-       * @param servletResponse the outgoing servlet response
-       * @param chain           the filter chain for passing non-Swagger UI requests
-       * @throws IOException      if an I/O error occurs during request handling
-       * @throws ServletException if a servlet-specific error occurs
-       */
       @Override
       public void doFilter(ServletRequest servletRequest, ServletResponse servletResponse, FilterChain chain)
             throws IOException, ServletException {
@@ -122,33 +141,66 @@ public class SwaggerUiConfig {
          HttpServletResponse response = (HttpServletResponse) servletResponse;
          String path = request.getRequestURI();
 
-         System.out.println("SwaggerUiFilter: path=" + path);
-         log.info("SwaggerUiFilter: path={}", path);
+         log.debug("UiResourcesFilter: path={}", path);
 
-         boolean isSwaggerUiResource = path.equals("/swagger-ui") || path.equals("/swagger-ui/index.html") ||
-               path.startsWith("/swagger-ui/") || SWAGGER_UI_RESOURCES.contains(path);
-
-         System.out.println("SwaggerUiFilter: isSwaggerUiResource=" + isSwaggerUiResource);
-         log.info("SwaggerUiFilter: isSwaggerUiResource={}", isSwaggerUiResource);
-
-         if (isSwaggerUiResource) {
-            String pathWithinHandlerMapping;
-            if (path.equals("/swagger-ui") || path.equals("/swagger-ui/") || path.equals("/swagger-ui/index.html")) {
-               pathWithinHandlerMapping = "index.html";
-            } else if (path.startsWith("/swagger-ui/")) {
-               pathWithinHandlerMapping = path.substring("/swagger-ui/".length());
-            } else {
-               pathWithinHandlerMapping = path.substring(1);
-            }
-            System.out.println("SwaggerUiFilter: handling pathWithinHandlerMapping=" + pathWithinHandlerMapping);
-            log.info("SwaggerUiFilter: pathWithinHandlerMapping={}", pathWithinHandlerMapping);
-            request.setAttribute("org.springframework.web.servlet.HandlerMapping.pathWithinHandlerMapping", pathWithinHandlerMapping);
-            request.setAttribute("org.springframework.web.servlet.HandlerMapping.bestMatchingHandler", handler);
-            request.setAttribute("org.springframework.web.servlet.HandlerMapping.lookupHandlerLookup", path);
-            handler.handleRequest(request, response);
+         // Check for Swagger UI resources
+         if (isSwaggerUiPath(path)) {
+            handleSwaggerUiRequest(request, response, path);
             return;
          }
+
+         // Check for Springwolf UI resources
+         if (isSpringwolfUiPath(path)) {
+            handleSpringwolfUiRequest(request, response, path);
+            return;
+         }
+
          chain.doFilter(servletRequest, servletResponse);
+      }
+
+      private boolean isSwaggerUiPath(String path) {
+         return path.equals("/swagger-ui") || path.equals("/swagger-ui/index.html") ||
+               path.startsWith("/swagger-ui/") || SWAGGER_UI_RESOURCES.contains(path);
+      }
+
+      private boolean isSpringwolfUiPath(String path) {
+         return path.equals("/springwolf-ui") || path.equals("/springwolf-ui/") ||
+               path.equals("/springwolf-ui/index.html") ||
+               path.startsWith("/springwolf-ui/") || SPRINGWOLF_UI_RESOURCES.contains(path);
+      }
+
+      private void handleSwaggerUiRequest(HttpServletRequest request, HttpServletResponse response, String path)
+            throws IOException, ServletException {
+         String pathWithinHandlerMapping;
+         if (path.equals("/swagger-ui") || path.equals("/swagger-ui/") || path.equals("/swagger-ui/index.html")) {
+            pathWithinHandlerMapping = "index.html";
+         } else if (path.startsWith("/swagger-ui/")) {
+            pathWithinHandlerMapping = path.substring("/swagger-ui/".length());
+         } else {
+            pathWithinHandlerMapping = path.substring(1);
+         }
+         log.debug("UiResourcesFilter: handling swagger-ui pathWithinHandlerMapping={}", pathWithinHandlerMapping);
+         request.setAttribute("org.springframework.web.servlet.HandlerMapping.pathWithinHandlerMapping", pathWithinHandlerMapping);
+         request.setAttribute("org.springframework.web.servlet.HandlerMapping.bestMatchingHandler", swaggerHandler);
+         request.setAttribute("org.springframework.web.servlet.HandlerMapping.lookupHandlerLookup", path);
+         swaggerHandler.handleRequest(request, response);
+      }
+
+      private void handleSpringwolfUiRequest(HttpServletRequest request, HttpServletResponse response, String path)
+            throws IOException, ServletException {
+         String pathWithinHandlerMapping;
+         if (path.equals("/springwolf-ui") || path.equals("/springwolf-ui/") || path.equals("/springwolf-ui/index.html")) {
+            pathWithinHandlerMapping = "asyncapi-ui.html";
+         } else if (path.startsWith("/springwolf-ui/")) {
+            pathWithinHandlerMapping = path.substring("/springwolf-ui/".length());
+         } else {
+            pathWithinHandlerMapping = path.substring(1);
+         }
+         log.debug("UiResourcesFilter: handling springwolf-ui pathWithinHandlerMapping={}", pathWithinHandlerMapping);
+         request.setAttribute("org.springframework.web.servlet.HandlerMapping.pathWithinHandlerMapping", pathWithinHandlerMapping);
+         request.setAttribute("org.springframework.web.servlet.HandlerMapping.bestMatchingHandler", springwolfHandler);
+         request.setAttribute("org.springframework.web.servlet.HandlerMapping.lookupHandlerLookup", path);
+         springwolfHandler.handleRequest(request, response);
       }
    }
 }

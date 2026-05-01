@@ -2,8 +2,8 @@
   "openapi": "3.0.3",
   "info": {
     "title": "DID Server API",
-    "description": "API for managing Decentralized Identifiers (DIDs) using the did:webvh method. This server provides endpoints for uploading, verifying, and downloading DID documents.\n\n## DID Format\n\nThis server supports the `did:webvh` method with SCID (Self-Contained Identifier).\n\n**Format:** `did:webvh:SCID:domain[:path...]`\n\n**Example:** `did:webvh:SCID:example.com:.well-known`\n\n## Storage Structure\n\nDID files are stored as `did.jsonl` in the following structure:\n- Root domain: `{storagePath}/{domain}/.well-known/did.jsonl`\n- Sub-path: `{storagePath}/{domain}/{path}/did.jsonl`",
-    "version": "1.9.1-SNAPSHOT",
+    "description": "API for managing Decentralized Identifiers (DIDs) using the did:webvh method, credential issuance sessions, verifiable presentations, and reward claiming.\n\n## DID Format\n\nThis server supports the `did:webvh` method with SCID (Self-Contained Identifier).\n\n**Format:** `did:webvh:SCID:domain[:path...]`\n\n**Example:** `did:webvh:SCID:example.com:.well-known`\n\n## Storage Structure\n\nDID files are stored as `did.jsonl` in the following structure:\n- Root domain: `{storagePath}/{domain}/.well-known/did.jsonl`\n- Sub-path: `{storagePath}/{domain}/{path}/did.jsonl`\n\n## WebSocket Sessions\n\nCredential issuance uses WebSocket sessions for real-time communication between issuer and holder. See `did-server-asyncapi.json` for the complete WebSocket channel specification.",
+    "version": "2.0.0",
     "contact": {
       "name": "Swiss Federal Chancellery"
     },
@@ -15,12 +15,16 @@
     {
       "url": "http://localhost:8080",
       "description": "Local development server"
+    },
+    {
+      "url": "https://did.ninja",
+      "description": "Production server"
     }
   ],
   "tags": [
     {
       "name": "DID Management",
-      "description": "Endpoints for uploading and retrieving DID documents"
+      "description": "Endpoints for creating, registering, updating, and retrieving DID documents"
     },
     {
       "name": "Health",
@@ -29,6 +33,26 @@
     {
       "name": "Documentation",
       "description": "API documentation endpoints"
+    },
+    {
+      "name": "Credential Issuance",
+      "description": "OIDC4VCI token and credential endpoints for credential issuance"
+    },
+    {
+      "name": "Sessions",
+      "description": "WebSocket session management for peer-to-peer credential issuance"
+    },
+    {
+      "name": "Verifiable Presentations",
+      "description": "Endpoints for submitting and verifying verifiable presentations"
+    },
+    {
+      "name": "Rewards",
+      "description": "Reward claiming and NFT issuance endpoints"
+    },
+    {
+      "name": "Server Configuration",
+      "description": "Server public key and configuration endpoints"
     }
   ],
   "paths": {
@@ -88,49 +112,6 @@
                         "status": "UP"
                       }
                     }
-                  },
-                  "degraded": {
-                    "summary": "Degraded server response (high memory)",
-                    "value": {
-                      "status": "DEGRADED",
-                      "timestamp": "2024-01-15T10:30:00Z",
-                      "filesystem": {
-                        "status": "UP",
-                        "storagePath": "/var/dids",
-                        "availableSpace": "50.00 GB"
-                      },
-                      "memory": {
-                        "status": "DEGRADED",
-                        "reason": "Heap memory usage high: 82.50%",
-                        "heap": {
-                          "max": "4.00 GB",
-                          "used": "3.30 GB",
-                          "committed": "4.00 GB",
-                          "usagePercent": "82.50"
-                        },
-                        "nonHeap": {
-                          "used": "128.00 MB",
-                          "committed": "256.00 MB"
-                        }
-                      },
-                      "jvm": {
-                        "availableProcessors": 4,
-                        "threadCount": 25,
-                        "peakThreadCount": 30,
-                        "uptime": "3600000ms",
-                        "vmName": "OpenJDK 64-Bit Server VM",
-                        "vmVersion": "17.0.1",
-                        "gcCollections": 500,
-                        "status": "UP"
-                      },
-                      "environment": {
-                        "tempDir": "writable",
-                        "userDir": "/opt/did-server",
-                        "fileEncoding": "UTF-8",
-                        "defaultLocale": "en_US",
-                        "status": "UP"
-                      }
-                    }
                   }
                 }
               }
@@ -142,50 +123,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HealthStatus"
-                },
-                "examples": {
-                  "unavailable": {
-                    "summary": "Service unavailable response (disk full)",
-                    "value": {
-                      "status": "DEGRADED",
-                      "timestamp": "2024-01-15T10:30:00Z",
-                      "filesystem": {
-                        "status": "DOWN",
-                        "reason": "Low disk space",
-                        "availableSpace": "50.00 MB"
-                      },
-                      "memory": {
-                        "status": "UP",
-                        "heap": {
-                          "max": "4.00 GB",
-                          "used": "512.00 MB",
-                          "committed": "1.00 GB",
-                          "usagePercent": "12.50"
-                        },
-                        "nonHeap": {
-                          "used": "128.00 MB",
-                          "committed": "256.00 MB"
-                        }
-                      },
-                      "jvm": {
-                        "availableProcessors": 4,
-                        "threadCount": 25,
-                        "peakThreadCount": 30,
-                        "uptime": "3600000ms",
-                        "vmName": "OpenJDK 64-Bit Server VM",
-                        "vmVersion": "17.0.1",
-                        "gcCollections": 150,
-                        "status": "UP"
-                      },
-                      "environment": {
-                        "tempDir": "writable",
-                        "userDir": "/opt/did-server",
-                        "fileEncoding": "UTF-8",
-                        "defaultLocale": "en_US",
-                        "status": "UP"
-                      }
-                    }
-                  }
                 }
               }
             }
@@ -197,7 +134,7 @@
       "post": {
         "tags": ["DID Management"],
         "summary": "Upload a DID log file",
-        "description": "Upload and verify a DID log file in JSONL format. The server performs the following validations:\n\n1. Ensures the uploaded file is not empty\n2. Extracts the DID ID and verifies the domain matches the `Host` header\n3. If a file already exists at the target path, verifies the SCID matches\n4. Resolves the DID log to verify its integrity\n\nOn successful validation, the file is stored at the resolved path.\n\n### DID Format\n\n`did:webvh:SCID:domain[:path...]`\n\n### Storage Paths\n\n- Root domain: `{storagePath}/{domain}/.well-known/did.jsonl`\n- Sub-path: `{storagePath}/{domain}/{path}/did.jsonl`",
+        "description": "Upload and verify a DID log file in JSONL format. The server performs the following validations:\n\n1. Ensures the uploaded file is not empty\n2. Extracts the DID ID and verifies the domain matches the `Host` header\n3. If a file already exists at the target path, verifies the SCID matches\n4. Resolves the DID log to verify its integrity\n\nOn successful validation, the file is stored at the resolved path.",
         "operationId": "uploadDid",
         "requestBody": {
           "required": true,
@@ -209,30 +146,14 @@
                   "didJsonl": {
                     "type": "string",
                     "format": "binary",
-                    "description": "The DID log file in JSONL format. Each line contains a JSON object representing a DID operation."
+                    "description": "The DID log file in JSONL format."
                   }
                 },
                 "required": ["didJsonl"]
-              },
-              "examples": {
-                "rootDomainDid": {
-                  "summary": "Root domain DID upload",
-                  "value": {
-                    "didJsonl": "{\"did\":{\"@context\":\"https://www.w3.org/ns/did/v1\",\"id\":\"did:webvh:SCID:example.com\",\"verificationMethod\":[{\"id\":\"did:webvh:SCID:example.com#key-1\",\"type\":\"JsonWebKey2020\",\"controller\":\"did:webvh:SCID:example.com\",\"publicKeyJwk\":{\"kty\":\"EC\",\"crv\":\"P-256\",\"x\":\"...\",\"y\":\"...\"}}],\"authentication\":[\"did:webvh:SCID:example.com#key-1\"]},\"meta\":{\"did\":true,\"versionId\":\"1\",\"versionTime\":\"2024-01-01T00:00:00Z\",\"proof\":{\"type\":\"DataIntegrityProof\",\"cryptosuite\":\"ecdsa-rdfc-2019\",\"proofValue\":\"...\"}}}"
-                  }
-                },
-                "subPathDid": {
-                  "summary": "Sub-path DID upload",
-                  "value": {
-                    "didJsonl": "{\"did\":{\"@context\":\"https://www.w3.org/ns/did/v1\",\"id\":\"did:webvh:SCID:example.com:api:v1:did:9131093b-ef52-46b4-8626-76dd9fe7f345\",\"verificationMethod\":[{\"id\":\"did:webvh:SCID:example.com:api:v1:did:9131093b-ef52-46b4-8626-76dd9fe7f345#key-1\",\"type\":\"JsonWebKey2020\",\"controller\":\"did:webvh:SCID:example.com:api:v1:did:9131093b-ef52-46b4-8626-76dd9fe7f345\",\"publicKeyJwk\":{\"kty\":\"EC\",\"crv\":\"P-256\",\"x\":\"...\",\"y\":\"...\"}}],\"authentication\":[\"did:webvh:SCID:example.com:api:v1:did:9131093b-ef52-46b4-8626-76dd9fe7f345#key-1\"]},\"meta\":{\"did\":true,\"versionId\":\"1\",\"versionTime\":\"2024-01-01T00:00:00Z\",\"proof\":{\"type\":\"DataIntegrityProof\",\"cryptosuite\":\"ecdsa-rdfc-2019\",\"proofValue\":\"...\"}}}"
-                  }
-                }
               }
             }
           }
         },
-        "parameters": [
-        ],
         "responses": {
           "200": {
             "description": "DID uploaded and verified successfully",
@@ -243,12 +164,7 @@
                 },
                 "examples": {
                   "success": {
-                    "summary": "Successful upload",
                     "value": "DID uploaded and verified successfully: did:webvh:SCID:example.com"
-                  },
-                  "successSubPath": {
-                    "summary": "Successful upload with sub-path",
-                    "value": "DID uploaded and verified successfully: did:webvh:SCID:example.com:api:v1:did:9131093b-ef52-46b4-8626-76dd9fe7f345"
                   }
                 }
               }
@@ -260,24 +176,6 @@
               "text/plain": {
                 "schema": {
                   "type": "string"
-                },
-                "examples": {
-                  "emptyFile": {
-                    "summary": "Empty file",
-                    "value": "File is empty"
-                  },
-                  "domainMismatch": {
-                    "summary": "Domain mismatch",
-                    "value": "Domain mismatch: expected example.com but got wrong.com"
-                  },
-                  "scidMismatch": {
-                    "summary": "SCID mismatch",
-                    "value": "SCID mismatch: existing DID has SCID abc123 but new DID has SCID def456"
-                  },
-                  "verificationFailed": {
-                    "summary": "Verification failure",
-                    "value": "Verification FAILED: Invalid proof"
-                  }
                 }
               }
             }
@@ -285,58 +183,183 @@
         }
       }
     },
-    "/**": {
+    "/did": {
+      "post": {
+        "tags": ["DID Management"],
+        "summary": "Register a new DID with the server",
+        "description": "Register a newly created did:webvh identity with the server. The client sends the DID string, DID document, and the complete DID log. The server validates the DID format, verifies the document integrity, and stores it.\n\nThis endpoint is used by `DidManager.createDid()` after local DID creation to persist the identity on the server.\n\n### Validation Steps\n\n1. Validates DID format (must be `did:webvh:...`)\n2. Verifies the DID document structure\n3. Validates the DID log entries and proof chain\n4. Stores the DID document and log",
+        "operationId": "registerDid",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DidRegistrationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "DID registered successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DidRegistrationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid DID registration request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "DID already exists with different document",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/did/{did}": {
       "get": {
         "tags": ["DID Management"],
-        "summary": "Download a DID document",
-        "description": "Downloads a DID file based on the request path and Host header. The DID is resolved from `{storage.path}/{domain}/{path}/did.jsonl`.\n\n### Path Resolution\n\n- Root path (`/`) or `.well-known`: resolves to `{storagePath}/{domain}/.well-known/did.jsonl`\n- Sub-path (e.g., `/api/v1/did/abc`): resolves to `{storagePath}/{domain}/api/v1/did/abc/did.jsonl`\n\n### Notes\n\n- Requests to `/dids` and `/health` return 405 Method Not Allowed\n- Documentation paths (`/docs`, `/swagger-ui`, etc.) are excluded from DID resolution",
-        "operationId": "downloadDid",
+        "summary": "Resolve a DID to its document",
+        "description": "Resolve a did:webvh identifier to its current DID document. The server looks up the DID in storage and returns the latest version of the DID document.\n\nThis endpoint is used by `DidManager.resolveDid()` to fetch remote DID documents.",
+        "operationId": "resolveDid",
         "parameters": [
+          {
+            "name": "did",
+            "in": "path",
+            "required": true,
+            "description": "URL-encoded DID string (e.g., `did%3Awebvh%3ASCID%3Aexample.com`)",
+            "schema": {
+              "type": "string",
+              "pattern": "^did:webvh:.+"
+            }
+          }
         ],
         "responses": {
           "200": {
             "description": "DID document found",
             "content": {
-              "application/jsonl": {
+              "application/json": {
                 "schema": {
-                  "type": "string",
-                  "format": "binary"
-                },
-                "examples": {
-                  "rootDomainDid": {
-                    "summary": "Root domain DID document",
-                    "value": "{\"did\":{\"@context\":\"https://www.w3.org/ns/did/v1\",\"id\":\"did:webvh:SCID:example.com\",\"verificationMethod\":[{\"id\":\"did:webvh:SCID:example.com#key-1\",\"type\":\"JsonWebKey2020\",\"controller\":\"did:webvh:SCID:example.com\",\"publicKeyJwk\":{\"kty\":\"EC\",\"crv\":\"P-256\",\"x\":\"...\",\"y\":\"...\"}}],\"authentication\":[\"did:webvh:SCID:example.com#key-1\"]},\"meta\":{\"did\":true,\"versionId\":\"1\",\"versionTime\":\"2024-01-01T00:00:00Z\",\"proof\":{\"type\":\"DataIntegrityProof\",\"cryptosuite\":\"ecdsa-rdfc-2019\",\"proofValue\":\"...\"}}}"
-                  },
-                  "subPathDid": {
-                    "summary": "Sub-path DID document",
-                    "value": "{\"did\":{\"@context\":\"https://www.w3.org/ns/did/v1\",\"id\":\"did:webvh:SCID:example.com:api:v1:did:9131093b-ef52-46b4-8626-76dd9fe7f345\",\"verificationMethod\":[{\"id\":\"did:webvh:SCID:example.com:api:v1:did:9131093b-ef52-46b4-8626-76dd9fe7f345#key-1\",\"type\":\"JsonWebKey2020\",\"controller\":\"did:webvh:SCID:example.com:api:v1:did:9131093b-ef52-46b4-8626-76dd9fe7f345\",\"publicKeyJwk\":{\"kty\":\"EC\",\"crv\":\"P-256\",\"x\":\"...\",\"y\":\"...\"}}],\"authentication\":[\"did:webvh:SCID:example.com:api:v1:did:9131093b-ef52-46b4-8626-76dd9fe7f345#key-1\"]},\"meta\":{\"did\":true,\"versionId\":\"1\",\"versionTime\":\"2024-01-01T00:00:00Z\",\"proof\":{\"type\":\"DataIntegrityProof\",\"cryptosuite\":\"ecdsa-rdfc-2019\",\"proofValue\":\"...\"}}}"
-                  }
+                  "$ref": "#/components/schemas/DidDocument"
                 }
               }
             }
           },
           "404": {
-            "description": "DID document not found",
+            "description": "DID not found",
             "content": {
-              "text/plain": {
+              "application/json": {
                 "schema": {
-                  "type": "string"
-                },
-                "examples": {
-                  "notFound": {
-                    "summary": "DID not found",
-                    "value": "DID file not found for this domain/path"
-                  }
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/did/{did}/update": {
+      "put": {
+        "tags": ["DID Management"],
+        "summary": "Update an existing DID document",
+        "description": "Update an existing DID document with a new version. The client must send the updated DID document along with the new log entry. The server validates that the update is authorized by checking the proof chain and that the client possesses the appropriate signing key.\n\n### Sync Requirement\n\nBefore calling this endpoint, the client should call `GET /did/{did}` to fetch the current version and ensure the local copy matches. If the server version differs, the client must merge changes before submitting the update.",
+        "operationId": "updateDid",
+        "parameters": [
+          {
+            "name": "did",
+            "in": "path",
+            "required": true,
+            "description": "URL-encoded DID string",
+            "schema": {
+              "type": "string",
+              "pattern": "^did:webvh:.+"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DidUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "DID document updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DidUpdateResponse"
                 }
               }
             }
           },
-          "405": {
-            "description": "Method not allowed for this path",
+          "400": {
+            "description": "Invalid update request",
             "content": {
-              "text/plain": {
+              "application/json": {
                 "schema": {
-                  "type": "string"
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Unauthorized - proof verification failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Version conflict - server has newer version",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VersionConflictResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/public-key": {
+      "get": {
+        "tags": ["Server Configuration"],
+        "summary": "Get the server's public key",
+        "description": "Fetch the server's public key in JWK format. This key is used as a controller in DID documents to enable DID recovery if the client's local key is lost. The server is responsible for rotating this key across all identities it controls when rotation is needed.\n\nClients should cache this value and re-fetch periodically or before creating new DIDs.",
+        "operationId": "getServerPublicKey",
+        "responses": {
+          "200": {
+            "description": "Server public key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServerPublicKeyResponse"
                 }
               }
             }
@@ -344,9 +367,339 @@
           "500": {
             "description": "Internal server error",
             "content": {
-              "text/plain": {
+              "application/json": {
                 "schema": {
-                  "type": "string"
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/token": {
+      "post": {
+        "tags": ["Credential Issuance"],
+        "summary": "Exchange pre-authorized code for access token (OIDC4VCI)",
+        "description": "Exchange a pre-authorized code for an access token as part of the OIDC4VCI pre-authorized code flow. This endpoint follows the OAuth 2.0 token endpoint specification.\n\n### Flow\n\n1. Holder receives credential offer with pre-authorized code\n2. Holder calls this endpoint with the code (and PIN if required)\n3. Server returns access token for credential request",
+        "operationId": "requestToken",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/TokenRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Token issued successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid token request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid pre-authorized code or PIN",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/credential": {
+      "post": {
+        "tags": ["Credential Issuance"],
+        "summary": "Request a verifiable credential (OIDC4VCI)",
+        "description": "Request a verifiable credential using an access token obtained from the `/token` endpoint. The credential is returned in the format specified in the original credential offer.\n\n### Authentication\n\nRequires a valid Bearer token obtained from the `/token` endpoint.",
+        "operationId": "requestCredential",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CredentialRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Credential issued successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CredentialResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid credential request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or expired access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/presentations": {
+      "post": {
+        "tags": ["Verifiable Presentations"],
+        "summary": "Submit a verifiable presentation for verification",
+        "description": "Submit a verifiable presentation (VP) for verification. The server validates the presentation's signatures, checks credential status, and returns the verification result.\n\nThis endpoint is used by `VcHolder.sendPresentation()` to submit VPs to the verifier.",
+        "operationId": "submitPresentation",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PresentationSubmissionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Presentation verified successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PresentationVerificationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid presentation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Presentation verification failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PresentationVerificationResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/claim-reward": {
+      "post": {
+        "tags": ["Rewards"],
+        "summary": "Claim a reward by submitting a verifiable presentation",
+        "description": "Claim a reward by submitting a verifiable presentation that satisfies the reward's DCQL (Data Credential Query Language) requirements.\n\n### Flow\n\n1. Client generates a VP matching the reward's DCQL\n2. Client calls this endpoint with the reward ID and VP\n3. Server verifies the VP against the DCQL\n4. If valid:\n   - Credentials marked for revocation in the reward definition are revoked\n   - An NFT is minted and transferred to the EVM address from the client's DID document\n5. Server returns success/failure with NFT transaction details\n\n### EVM Address Resolution\n\nThe server extracts the EVM address from the service endpoint in the DID document associated with the presentation's holder DID.",
+        "operationId": "claimReward",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClaimRewardRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Reward claimed successfully, NFT issued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClaimRewardResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid claim request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Presentation does not satisfy DCQL requirements",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClaimRewardResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Reward not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions": {
+      "post": {
+        "tags": ["Sessions"],
+        "summary": "Create a new credential issuance session",
+        "description": "Create a new credential issuance session. The issuer calls this endpoint to generate a unique session ID and prepare the server for WebSocket-based credential exchange.\n\n### Flow\n\n1. Issuer creates session via this endpoint\n2. Server generates a UUID-based session ID\n3. Issuer opens WebSocket connection to `/ws/session/{sessionId}`\n4. Issuer shares session ID via QR code\n5. Holder scans QR code and connects to same WebSocket\n6. Credential exchange happens through the WebSocket relay",
+        "operationId": "createSession",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSessionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Session created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateSessionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid session request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{sessionId}": {
+      "get": {
+        "tags": ["Sessions"],
+        "summary": "Get session status",
+        "description": "Retrieve the current status of a credential issuance session. Used to check whether a holder has connected, whether the credential has been issued, or if the session has expired.",
+        "operationId": "getSessionStatus",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "description": "The session UUID",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Session status retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionStatusResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Session not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Sessions"],
+        "summary": "Cancel a session",
+        "description": "Cancel an active credential issuance session. This closes any open WebSocket connections and cleans up server-side session state. Can be called by the issuer to abort an issuance flow.",
+        "operationId": "cancelSession",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "description": "The session UUID",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Session cancelled successfully"
+          },
+          "404": {
+            "description": "Session not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -358,7 +711,7 @@
       "get": {
         "tags": ["Documentation"],
         "summary": "Get API documentation (HTML)",
-        "description": "Returns an HTML page with interactive documentation for the DID Server API, including endpoint descriptions, DID format specifications, and error handling details.",
+        "description": "Returns an HTML page with interactive documentation for the DID Server API.",
         "operationId": "getDocumentation",
         "responses": {
           "200": {
@@ -396,20 +749,25 @@
     }
   },
   "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "OAuth 2.0 Bearer token obtained from the /token endpoint"
+      }
+    },
     "schemas": {
       "HealthStatus": {
         "type": "object",
-        "description": "Comprehensive health status response containing subsystem health details.",
+        "description": "Comprehensive health status response.",
         "properties": {
           "status": {
             "type": "string",
-            "enum": ["UP", "DEGRADED"],
-            "description": "Overall server status. UP means all components are healthy, DEGRADED means at least one component has issues."
+            "enum": ["UP", "DEGRADED"]
           },
           "timestamp": {
             "type": "string",
-            "format": "date-time",
-            "description": "ISO-8601 timestamp of when the health check was performed."
+            "format": "date-time"
           },
           "filesystem": {
             "$ref": "#/components/schemas/FilesystemHealth"
@@ -427,35 +785,28 @@
       },
       "FilesystemHealth": {
         "type": "object",
-        "description": "File system health status including storage path accessibility and available disk space.",
         "properties": {
           "status": {
             "type": "string",
-            "enum": ["UP", "DOWN", "DEGRADED"],
-            "description": "Filesystem status: UP (healthy), DOWN (inaccessible or permission denied), DEGRADED (low disk space < 100MB)."
+            "enum": ["UP", "DOWN", "DEGRADED"]
           },
           "storagePath": {
-            "type": "string",
-            "description": "Configured path to the DID storage directory."
+            "type": "string"
           },
           "availableSpace": {
-            "type": "string",
-            "description": "Human-readable available storage space (e.g., '50.00 GB', '100.00 MB')."
+            "type": "string"
           },
           "reason": {
-            "type": "string",
-            "description": "Explanation of why the status is DOWN or DEGRADED."
+            "type": "string"
           }
         }
       },
       "MemoryHealth": {
         "type": "object",
-        "description": "JVM memory health status including heap and non-heap memory usage.",
         "properties": {
           "status": {
             "type": "string",
-            "enum": ["UP", "DOWN", "DEGRADED"],
-            "description": "Memory status: UP (< 75% heap), DEGRADED (75-90% heap), DOWN (> 90% heap)."
+            "enum": ["UP", "DOWN", "DEGRADED"]
           },
           "heap": {
             "$ref": "#/components/schemas/HeapMemory"
@@ -467,104 +818,536 @@
       },
       "HeapMemory": {
         "type": "object",
-        "description": "JVM heap memory usage details.",
         "properties": {
-          "max": {
-            "type": "string",
-            "description": "Maximum heap memory size (e.g., '4.00 GB')."
-          },
-          "used": {
-            "type": "string",
-            "description": "Currently used heap memory (e.g., '512.00 MB')."
-          },
-          "committed": {
-            "type": "string",
-            "description": "Committed heap memory guaranteed to be available (e.g., '1.00 GB')."
-          },
-          "usagePercent": {
-            "type": "string",
-            "description": "Heap usage as a percentage of max (e.g., '12.50')."
-          }
+          "max": { "type": "string" },
+          "used": { "type": "string" },
+          "committed": { "type": "string" },
+          "usagePercent": { "type": "string" }
         }
       },
       "NonHeapMemory": {
         "type": "object",
-        "description": "JVM non-heap memory usage details (metaspace, code cache, etc.).",
         "properties": {
-          "used": {
-            "type": "string",
-            "description": "Currently used non-heap memory (e.g., '128.00 MB')."
-          },
-          "committed": {
-            "type": "string",
-            "description": "Committed non-heap memory (e.g., '256.00 MB')."
-          }
+          "used": { "type": "string" },
+          "committed": { "type": "string" }
         }
       },
       "JvmHealth": {
         "type": "object",
-        "description": "JVM runtime information including thread counts, uptime, and garbage collection statistics.",
         "properties": {
-          "availableProcessors": {
-            "type": "integer",
-            "description": "Number of available CPU processors."
-          },
-          "threadCount": {
-            "type": "integer",
-            "description": "Current number of live threads."
-          },
-          "peakThreadCount": {
-            "type": "integer",
-            "description": "Peak number of live threads since JVM start."
-          },
-          "uptime": {
-            "type": "string",
-            "description": "JVM uptime in milliseconds (e.g., '3600000ms')."
-          },
-          "vmName": {
-            "type": "string",
-            "description": "JVM name (e.g., 'OpenJDK 64-Bit Server VM')."
-          },
-          "vmVersion": {
-            "type": "string",
-            "description": "JVM version (e.g., '17.0.1')."
-          },
-          "gcCollections": {
-            "type": "integer",
-            "description": "Total number of garbage collection collections across all GC beans."
-          },
-          "status": {
-            "type": "string",
-            "enum": ["UP", "DOWN"],
-            "description": "JVM status (always UP unless an unexpected error occurs)."
-          }
+          "availableProcessors": { "type": "integer" },
+          "threadCount": { "type": "integer" },
+          "peakThreadCount": { "type": "integer" },
+          "uptime": { "type": "string" },
+          "vmName": { "type": "string" },
+          "vmVersion": { "type": "string" },
+          "gcCollections": { "type": "integer" },
+          "status": { "type": "string", "enum": ["UP", "DOWN"] }
         }
       },
       "EnvironmentHealth": {
         "type": "object",
-        "description": "Runtime environment information including temp directory, user directory, encoding, and locale.",
         "properties": {
-          "tempDir": {
-            "type": "string",
-            "description": "Temp directory status: 'writable', 'not writable', or an error message."
+          "tempDir": { "type": "string" },
+          "userDir": { "type": "string" },
+          "fileEncoding": { "type": "string" },
+          "defaultLocale": { "type": "string" },
+          "status": { "type": "string", "enum": ["UP", "DOWN"] }
+        }
+      },
+      "DidDocument": {
+        "type": "object",
+        "description": "W3C DID Document",
+        "properties": {
+          "@context": {
+            "oneOf": [
+              { "type": "string" },
+              { "type": "array", "items": { "type": "string" } }
+            ]
           },
-          "userDir": {
+          "id": {
             "type": "string",
-            "description": "Current working directory of the JVM process."
+            "description": "DID identifier (e.g., did:webvh:SCID:example.com)"
           },
-          "fileEncoding": {
+          "controller": {
+            "oneOf": [
+              { "type": "string" },
+              { "type": "array", "items": { "type": "string" } }
+            ],
+            "description": "Entity that controls the DID. Includes the server's public key for recovery."
+          },
+          "alsoKnownAs": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "verificationMethod": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VerificationMethod"
+            }
+          },
+          "authentication": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                { "type": "string" },
+                { "$ref": "#/components/schemas/VerificationMethod" }
+              ]
+            }
+          },
+          "assertionMethod": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                { "type": "string" },
+                { "$ref": "#/components/schemas/VerificationMethod" }
+              ]
+            }
+          },
+          "keyAgreement": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                { "type": "string" },
+                { "$ref": "#/components/schemas/VerificationMethod" }
+              ]
+            }
+          },
+          "capabilityInvocation": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                { "type": "string" },
+                { "$ref": "#/components/schemas/VerificationMethod" }
+              ]
+            }
+          },
+          "capabilityDelegation": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                { "type": "string" },
+                { "$ref": "#/components/schemas/VerificationMethod" }
+              ]
+            }
+          },
+          "service": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ServiceEndpoint"
+            }
+          }
+        },
+        "required": ["id"]
+      },
+      "VerificationMethod": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "type": { "type": "string" },
+          "controller": { "type": "string" },
+          "publicKeyMultibase": { "type": "string" },
+          "publicKeyJwk": {
+            "type": "object",
+            "properties": {
+              "kty": { "type": "string" },
+              "crv": { "type": "string" },
+              "x": { "type": "string" },
+              "y": { "type": "string" }
+            }
+          }
+        },
+        "required": ["id", "type", "controller"]
+      },
+      "ServiceEndpoint": {
+        "type": "object",
+        "description": "Service endpoint in a DID document. Used to store the EVM address for NFT issuance.",
+        "properties": {
+          "id": { "type": "string" },
+          "type": {
+            "oneOf": [
+              { "type": "string" },
+              { "type": "array", "items": { "type": "string" } }
+            ]
+          },
+          "serviceEndpoint": {
+            "oneOf": [
+              { "type": "string" },
+              { "type": "array", "items": { "type": "string" } },
+              { "type": "object" }
+            ],
+            "description": "For EVM addresses: { \"evmAddress\": \"0x...\" }"
+          }
+        },
+        "required": ["id", "type", "serviceEndpoint"]
+      },
+      "DidRegistrationRequest": {
+        "type": "object",
+        "description": "Request to register a new DID with the server.",
+        "properties": {
+          "did": {
             "type": "string",
-            "description": "Default file encoding (e.g., 'UTF-8')."
+            "description": "The DID string (e.g., did:webvh:SCID:example.com)"
           },
-          "defaultLocale": {
+          "document": {
+            "$ref": "#/components/schemas/DidDocument",
+            "description": "The DID document"
+          },
+          "log": {
+            "type": "array",
+            "description": "DID log entries with proofs",
+            "items": {
+              "type": "object"
+            }
+          }
+        },
+        "required": ["did", "document", "log"]
+      },
+      "DidRegistrationResponse": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean" },
+          "did": { "type": "string" },
+          "message": { "type": "string" }
+        }
+      },
+      "DidUpdateRequest": {
+        "type": "object",
+        "description": "Request to update an existing DID document.",
+        "properties": {
+          "document": {
+            "$ref": "#/components/schemas/DidDocument"
+          },
+          "logEntry": {
+            "type": "object",
+            "description": "New log entry with proof for the update"
+          },
+          "versionId": {
             "type": "string",
-            "description": "Default locale (e.g., 'en_US')."
+            "description": "Expected current version ID for optimistic locking"
+          }
+        },
+        "required": ["document", "logEntry"]
+      },
+      "DidUpdateResponse": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean" },
+          "versionId": { "type": "string" },
+          "message": { "type": "string" }
+        }
+      },
+      "VersionConflictResponse": {
+        "type": "object",
+        "description": "Returned when the server has a newer version of the DID document than the client.",
+        "properties": {
+          "error": { "type": "string" },
+          "message": {
+            "type": "string",
+            "description": "Description of the conflict"
           },
+          "serverVersionId": {
+            "type": "string",
+            "description": "Current version ID on the server"
+          },
+          "clientVersionId": {
+            "type": "string",
+            "description": "Version ID the client attempted to update from"
+          },
+          "serverDocument": {
+            "$ref": "#/components/schemas/DidDocument",
+            "description": "Current DID document on the server for client to merge"
+          }
+        }
+      },
+      "ServerPublicKeyResponse": {
+        "type": "object",
+        "description": "Server's public key for DID recovery.",
+        "properties": {
+          "publicKey": {
+            "$ref": "#/components/schemas/JsonWebKey"
+          },
+          "keyId": {
+            "type": "string",
+            "description": "Key identifier"
+          },
+          "algorithm": {
+            "type": "string",
+            "description": "Signing algorithm (e.g., ES256)"
+          },
+          "rotatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Timestamp of last key rotation"
+          }
+        }
+      },
+      "JsonWebKey": {
+        "type": "object",
+        "description": "JSON Web Key (RFC 7517)",
+        "properties": {
+          "kty": { "type": "string", "description": "Key type (e.g., EC)" },
+          "crv": { "type": "string", "description": "Curve (e.g., P-256)" },
+          "x": { "type": "string", "description": "X coordinate (base64url)" },
+          "y": { "type": "string", "description": "Y coordinate (base64url)" }
+        }
+      },
+      "TokenRequest": {
+        "type": "object",
+        "description": "OAuth 2.0 token request for OIDC4VCI pre-authorized code flow.",
+        "properties": {
+          "grant_type": {
+            "type": "string",
+            "enum": ["urn:ietf:params:oauth:grant-type:pre-authorized_code"]
+          },
+          "pre-authorized_code": {
+            "type": "string",
+            "description": "The pre-authorized code from the credential offer"
+          },
+          "user_pin": {
+            "type": "string",
+            "description": "User PIN, required if user_pin_required was true in the offer"
+          }
+        },
+        "required": ["grant_type", "pre-authorized_code"]
+      },
+      "TokenResponse": {
+        "type": "object",
+        "description": "OAuth 2.0 token response.",
+        "properties": {
+          "access_token": { "type": "string" },
+          "token_type": { "type": "string", "default": "Bearer" },
+          "expires_in": { "type": "integer" },
+          "c_nonce": { "type": "string" },
+          "c_nonce_expires_in": { "type": "integer" },
+          "refresh_token": { "type": "string" }
+        },
+        "required": ["access_token", "token_type"]
+      },
+      "OAuthErrorResponse": {
+        "type": "object",
+        "properties": {
+          "error": { "type": "string" },
+          "error_description": { "type": "string" }
+        }
+      },
+      "CredentialRequest": {
+        "type": "object",
+        "description": "Credential request body for OIDC4VCI.",
+        "properties": {
+          "format": {
+            "type": "string",
+            "description": "Credential format (e.g., jwt_vc_json)"
+          },
+          "credential_definition": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "array",
+                "items": { "type": "string" }
+              }
+            }
+          },
+          "proof": {
+            "type": "object",
+            "description": "Proof of possession of the key material",
+            "properties": {
+              "proof_type": { "type": "string" },
+              "jwt": { "type": "string" }
+            }
+          }
+        },
+        "required": ["format", "credential_definition"]
+      },
+      "CredentialResponse": {
+        "type": "object",
+        "description": "Credential response containing the issued VC.",
+        "properties": {
+          "credential": {
+            "type": "string",
+            "description": "The issued credential (JWT string)"
+          },
+          "format": {
+            "type": "string",
+            "description": "Credential format"
+          }
+        },
+        "required": ["credential"]
+      },
+      "PresentationSubmissionRequest": {
+        "type": "object",
+        "description": "Request to submit a verifiable presentation for verification.",
+        "properties": {
+          "presentation": {
+            "type": "string",
+            "description": "The verifiable presentation (JWT string or SD-JWT)"
+          }
+        },
+        "required": ["presentation"]
+      },
+      "PresentationVerificationResponse": {
+        "type": "object",
+        "description": "Result of presentation verification.",
+        "properties": {
+          "verified": { "type": "boolean" },
+          "errors": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "holderDid": {
+            "type": "string",
+            "description": "DID of the presentation holder"
+          },
+          "credentials": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "issuer": { "type": "string" },
+                "type": { "type": "array", "items": { "type": "string" } },
+                "verified": { "type": "boolean" }
+              }
+            }
+          }
+        },
+        "required": ["verified"]
+      },
+      "ClaimRewardRequest": {
+        "type": "object",
+        "description": "Request to claim a reward by submitting a verifiable presentation.",
+        "properties": {
+          "rewardId": {
+            "type": "string",
+            "description": "Identifier of the reward to claim"
+          },
+          "presentation": {
+            "type": "string",
+            "description": "Verifiable presentation (JWT) that satisfies the reward's DCQL"
+          }
+        },
+        "required": ["rewardId", "presentation"]
+      },
+      "ClaimRewardResponse": {
+        "type": "object",
+        "description": "Response from reward claim operation.",
+        "properties": {
+          "success": { "type": "boolean" },
+          "message": { "type": "string" },
+          "nftTransaction": {
+            "$ref": "#/components/schemas/NftTransaction",
+            "description": "NFT transaction details (present on success)"
+          },
+          "errors": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Verification errors (present on failure)"
+          },
+          "revokedCredentials": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "List of credential IDs revoked as part of this claim"
+          }
+        },
+        "required": ["success"]
+      },
+      "NftTransaction": {
+        "type": "object",
+        "description": "Details of an NFT minting/transfer transaction.",
+        "properties": {
+          "txHash": {
+            "type": "string",
+            "description": "Blockchain transaction hash"
+          },
+          "tokenId": {
+            "type": "string",
+            "description": "NFT token ID"
+          },
+          "contractAddress": {
+            "type": "string",
+            "description": "NFT contract address"
+          },
+          "recipientAddress": {
+            "type": "string",
+            "description": "EVM address that received the NFT"
+          },
+          "chainId": {
+            "type": "integer",
+            "description": "Blockchain chain ID"
+          }
+        }
+      },
+      "CreateSessionRequest": {
+        "type": "object",
+        "description": "Request to create a credential issuance session.",
+        "properties": {
+          "transportType": {
+            "type": "string",
+            "enum": ["websocket", "waku", "webrtc", "ble"],
+            "description": "Transport mechanism for the session"
+          },
+          "credentialType": {
+            "type": "string",
+            "description": "Type of credential to be issued"
+          },
+          "timeout": {
+            "type": "integer",
+            "description": "Session timeout in seconds (default: 300)",
+            "default": 300
+          }
+        },
+        "required": ["transportType"]
+      },
+      "CreateSessionResponse": {
+        "type": "object",
+        "description": "Response after creating a credential issuance session.",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Unique session identifier"
+          },
+          "wsUrl": {
+            "type": "string",
+            "description": "WebSocket URL for connecting to this session (e.g., ws://host/ws/session/{sessionId})"
+          },
+          "qrCodeData": {
+            "type": "string",
+            "description": "Data to encode in the QR code for holder to scan"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Session expiration timestamp"
+          }
+        },
+        "required": ["sessionId", "wsUrl", "qrCodeData"]
+      },
+      "SessionStatusResponse": {
+        "type": "object",
+        "description": "Current status of a credential issuance session.",
+        "properties": {
+          "sessionId": { "type": "string", "format": "uuid" },
           "status": {
             "type": "string",
-            "enum": ["UP", "DOWN"],
-            "description": "Environment status (always UP unless an unexpected error occurs)."
-          }
+            "enum": ["pending", "holder_connected", "credential_issued", "completed", "expired", "cancelled"]
+          },
+          "transportType": { "type": "string" },
+          "holderDid": {
+            "type": "string",
+            "description": "Holder's DID (populated after holder connects)"
+          },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "expiresAt": { "type": "string", "format": "date-time" }
+        },
+        "required": ["sessionId", "status"]
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "description": "Generic error response.",
+        "properties": {
+          "error": { "type": "string" },
+          "message": { "type": "string" },
+          "details": { "type": "object" }
         }
       }
     }

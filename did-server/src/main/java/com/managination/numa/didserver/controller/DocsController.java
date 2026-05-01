@@ -45,7 +45,7 @@ public class DocsController {
      * @throws IOException if the classpath resource cannot be read
      */
     @Operation(
-        summary = "Get API documentation",
+        summary = "Get OpenAPI specification",
         description = "Returns the OpenAPI 3.0 specification for the DID Server API in JSON format"
     )
     @GetMapping(value = "/openapi.json", produces = MediaType.APPLICATION_JSON_VALUE)
