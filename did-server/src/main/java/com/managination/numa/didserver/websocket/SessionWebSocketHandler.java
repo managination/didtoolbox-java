@@ -4,6 +4,11 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.managination.numa.didserver.dto.websocket.*;
 import com.managination.numa.didserver.service.SessionService;
+import io.github.springwolf.core.asyncapi.annotations.AsyncListener;
+import io.github.springwolf.core.asyncapi.annotations.AsyncListeners;
+import io.github.springwolf.core.asyncapi.annotations.AsyncMessage;
+import io.github.springwolf.core.asyncapi.annotations.AsyncOperation;
+import io.github.springwolf.core.asyncapi.annotations.AsyncPublisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -59,6 +64,26 @@ public class SessionWebSocketHandler extends TextWebSocketHandler {
         log.info("WebSocket connection established for session: {}", sessionId);
     }
 
+    @AsyncListeners({
+        @AsyncListener(operation = @AsyncOperation(
+            channelName = "/ws/session/{sessionId}",
+            description = "Client sends a join request to identify their role (issuer or holder).",
+            message = @AsyncMessage(name = "JoinMessage", description = "Join a session"),
+            payloadType = JoinMessage.class
+        )),
+        @AsyncListener(operation = @AsyncOperation(
+            channelName = "/ws/session/{sessionId}",
+            description = "Holder sends their DID to the server, which relays it to the issuer.",
+            message = @AsyncMessage(name = "HolderDidMessage", description = "Holder's DID"),
+            payloadType = HolderDidMessage.class
+        )),
+        @AsyncListener(operation = @AsyncOperation(
+            channelName = "/ws/session/{sessionId}",
+            description = "Issuer sends a credential to the server, which relays it to the holder.",
+            message = @AsyncMessage(name = "CredentialMessage", description = "Issued credential"),
+            payloadType = CredentialMessage.class
+        ))
+    })
     @Override
     protected void handleTextMessage(WebSocketSession session, TextMessage message) throws Exception {
         String sessionId = extractSessionId(session.getUri());
@@ -218,6 +243,24 @@ public class SessionWebSocketHandler extends TextWebSocketHandler {
         log.info("Credential relayed to holder for session: {}", sessionId);
     }
 
+    @AsyncPublisher(operation = @AsyncOperation(
+        channelName = "/ws/session/{sessionId}",
+        description = "Server sends this to the issuer when a holder joins the session.",
+        message = @AsyncMessage(name = "SessionReadyMessage", description = "Session ready"),
+        payloadType = SessionReadyMessage.class
+    ))
+    @AsyncPublisher(operation = @AsyncOperation(
+        channelName = "/ws/session/{sessionId}",
+        description = "Server relays the holder's DID to the issuer.",
+        message = @AsyncMessage(name = "HolderDidMessage", description = "Holder's DID"),
+        payloadType = HolderDidMessage.class
+    ))
+    @AsyncPublisher(operation = @AsyncOperation(
+        channelName = "/ws/session/{sessionId}",
+        description = "Server sends this to the issuer after the holder acknowledges receipt.",
+        message = @AsyncMessage(name = "CredentialReceivedMessage", description = "Credential received"),
+        payloadType = CredentialReceivedMessage.class
+    ))
     private void sendToIssuer(String sessionId, Object message) throws IOException {
         WebSocketSession issuerSession = issuerSessions.get(sessionId);
         if (issuerSession != null && issuerSession.isOpen()) {
@@ -227,6 +270,12 @@ public class SessionWebSocketHandler extends TextWebSocketHandler {
         }
     }
 
+    @AsyncPublisher(operation = @AsyncOperation(
+        channelName = "/ws/session/{sessionId}",
+        description = "Server relays the credential from the issuer to the holder.",
+        message = @AsyncMessage(name = "CredentialMessage", description = "Issued credential"),
+        payloadType = CredentialMessage.class
+    ))
     private void sendToHolder(String sessionId, Object message) throws IOException {
         WebSocketSession holderSession = holderSessions.get(sessionId);
         if (holderSession != null && holderSession.isOpen()) {
@@ -243,6 +292,12 @@ public class SessionWebSocketHandler extends TextWebSocketHandler {
         session.sendMessage(new TextMessage(json));
     }
 
+    @AsyncPublisher(operation = @AsyncOperation(
+        channelName = "/ws/session/{sessionId}",
+        description = "Server sends this when something goes wrong during the session.",
+        message = @AsyncMessage(name = "ErrorMessage", description = "Error"),
+        payloadType = ErrorMessage.class
+    ))
     private void sendError(WebSocketSession session, String sessionId, String code, String message) throws IOException {
         ErrorMessage errorMessage = new ErrorMessage(sessionId, code, message);
         String json = objectMapper.writeValueAsString(errorMessage);
@@ -262,6 +317,12 @@ public class SessionWebSocketHandler extends TextWebSocketHandler {
         return variables.get("sessionId");
     }
 
+    @AsyncPublisher(operation = @AsyncOperation(
+        channelName = "/ws/session/{sessionId}",
+        description = "Server sends this to the holder when the issuer cancels the session.",
+        message = @AsyncMessage(name = "SessionCancelledMessage", description = "Session cancelled"),
+        payloadType = SessionCancelledMessage.class
+    ))
     public void notifySessionCancelled(String sessionId) {
         WebSocketSession holderSession = holderSessions.get(sessionId);
         if (holderSession != null && holderSession.isOpen()) {
@@ -276,6 +337,12 @@ public class SessionWebSocketHandler extends TextWebSocketHandler {
         issuerSessions.remove(sessionId);
     }
 
+    @AsyncPublisher(operation = @AsyncOperation(
+        channelName = "/ws/session/{sessionId}",
+        description = "Server sends this to both parties when the session times out.",
+        message = @AsyncMessage(name = "SessionExpiredMessage", description = "Session expired"),
+        payloadType = SessionExpiredMessage.class
+    ))
     public void notifySessionExpired(String sessionId) {
         sessionService.expireSession(sessionId);
         SessionExpiredMessage message = new SessionExpiredMessage(sessionId);

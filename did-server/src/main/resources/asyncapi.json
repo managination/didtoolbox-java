@@ -367,11 +367,12 @@
                   "INVALID_MESSAGE",
                   "UNAUTHORIZED",
                   "SESSION_NOT_FOUND",
-                  "SESSION_EXPIRED",
                   "DUPLICATE_JOIN",
                   "ROLE_MISMATCH",
                   "INVALID_DID",
                   "INVALID_CREDENTIAL",
+                  "INVALID_FORMAT",
+                  "MESSAGE_TOO_LARGE",
                   "INTERNAL_ERROR"
                 ]
               },

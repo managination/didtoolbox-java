@@ -9,10 +9,12 @@ import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.http.MediaType;
 import org.springframework.web.servlet.resource.PathResourceResolver;
 import org.springframework.web.servlet.resource.ResourceHttpRequestHandler;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Set;
 
@@ -38,6 +40,12 @@ public class SwaggerUiConfig {
     * Classpath prefix where Springwolf UI static resources are located.
     */
    private static final String SPRINGWOLF_UI_CLASSPATH = "/META-INF/resources/springwolf/";
+
+    /**
+     * Springwolf API endpoints that the Angular UI requests under /springwolf-ui/
+     * but are actually served under /springwolf/.
+     */
+    private static final List<String> SPRINGWOLF_API_PATHS = List.of("/docs", "/ui-config");
 
    /**
     * Registers the {@link UiResourcesFilter} to handle all incoming requests ({@code /*}).
@@ -143,6 +151,24 @@ public class SwaggerUiConfig {
 
          log.debug("UiResourcesFilter: path={}", path);
 
+         // Forward Springwolf API paths from /springwolf-ui/<endpoint> to /springwolf/<endpoint>
+         // The Angular UI computes contextPath as /springwolf-ui/ (with trailing slash) and requests
+         // /springwolf-ui//docs, /springwolf-ui//ui-config but Springwolf serves these at /springwolf/docs
+         // Also handle single-slash variants like /springwolf-ui/docs
+         if (path.startsWith("/springwolf-ui/")) {
+            String suffix = path.substring("/springwolf-ui".length());
+            // Normalize double slashes (from contextPath="/springwolf-ui/" + "/docs" = "/springwolf-ui//docs")
+            suffix = suffix.replace("//", "/");
+            for (String apiPath : SPRINGWOLF_API_PATHS) {
+               if (suffix.equals(apiPath) || suffix.startsWith(apiPath + "/") || suffix.startsWith(apiPath + "?")) {
+                  String targetPath = "/springwolf" + suffix;
+                  log.debug("UiResourcesFilter: forwarding {} -> {}", path, targetPath);
+                  request.getRequestDispatcher(targetPath).forward(request, response);
+                  return;
+               }
+            }
+         }
+
          // Check for Swagger UI resources
          if (isSwaggerUiPath(path)) {
             handleSwaggerUiRequest(request, response, path);
@@ -164,15 +190,20 @@ public class SwaggerUiConfig {
       }
 
       private boolean isSpringwolfUiPath(String path) {
-         return path.equals("/springwolf-ui") || path.equals("/springwolf-ui/") ||
+         return path.equals("/springwolf-ui") ||
                path.equals("/springwolf-ui/index.html") ||
                path.startsWith("/springwolf-ui/") || SPRINGWOLF_UI_RESOURCES.contains(path);
       }
 
       private void handleSwaggerUiRequest(HttpServletRequest request, HttpServletResponse response, String path)
             throws IOException, ServletException {
+         // Redirect bare path to trailing-slash version so <base href="./"> resolves correctly
+         if (path.equals("/swagger-ui")) {
+            response.sendRedirect(request.getContextPath() + "/swagger-ui/");
+            return;
+         }
          String pathWithinHandlerMapping;
-         if (path.equals("/swagger-ui") || path.equals("/swagger-ui/") || path.equals("/swagger-ui/index.html")) {
+         if (path.equals("/swagger-ui/") || path.equals("/swagger-ui/index.html")) {
             pathWithinHandlerMapping = "index.html";
          } else if (path.startsWith("/swagger-ui/")) {
             pathWithinHandlerMapping = path.substring("/swagger-ui/".length());
@@ -188,8 +219,15 @@ public class SwaggerUiConfig {
 
       private void handleSpringwolfUiRequest(HttpServletRequest request, HttpServletResponse response, String path)
             throws IOException, ServletException {
+         // Redirect to asyncapi-ui.html so the Angular app's getContextPath()
+         // (which does pathname.split("/asyncapi-ui.html")[0]) computes "/springwolf-ui"
+         // without a trailing slash, avoiding double-slash URLs like /springwolf-ui//docs
+         if (path.equals("/springwolf-ui") || path.equals("/springwolf-ui/")) {
+            response.sendRedirect(request.getContextPath() + "/springwolf-ui/asyncapi-ui.html");
+            return;
+         }
          String pathWithinHandlerMapping;
-         if (path.equals("/springwolf-ui") || path.equals("/springwolf-ui/") || path.equals("/springwolf-ui/index.html")) {
+         if (path.equals("/springwolf-ui/index.html")) {
             pathWithinHandlerMapping = "asyncapi-ui.html";
          } else if (path.startsWith("/springwolf-ui/")) {
             pathWithinHandlerMapping = path.substring("/springwolf-ui/".length());
